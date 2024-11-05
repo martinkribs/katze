@@ -1,16 +1,7 @@
-import '../../core/error/failures.dart';
-import '../entities/role.dart';
-import '../repositories/role_repository.dart';
-import 'package:dartz/dartz.dart';
+import 'package:katze/domain/entities/role.dart';
 
 class GetConcreteRole {
-  final RoleRepository repository;
-
-  GetConcreteRole(this.repository);
-
-  Future<Either<Failure, Role>> execute({
-    required String name,
-  }) async {
-    return await repository.getConcreteRole(name);
+  Role call(RoleType roleType) {
+    return Role.createDefaultRole(roleType);
   }
 }

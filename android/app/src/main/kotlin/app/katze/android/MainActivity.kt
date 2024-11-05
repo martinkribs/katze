@@ -1,4 +1,4 @@
-package dev.bakerstreet.katze
+package app.katze.android
 
 import io.flutter.embedding.android.FlutterActivity
 
