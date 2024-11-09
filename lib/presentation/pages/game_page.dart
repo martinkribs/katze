@@ -1,157 +1,236 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:katze/presentation/bloc/game/game_bloc.dart';
-import 'package:katze/presentation/bloc/theme/theme_bloc.dart';
+import 'package:flutter/services.dart';
+import 'package:katze/core/services/game_service.dart';
+import 'package:katze/di/injection_container.dart';
+import 'package:share_plus/share_plus.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key});
+  final dynamic gameId;
+
+  const GamePage({
+    super.key,
+    required this.gameId,
+  });
 
   @override
   _GamePageState createState() => _GamePageState();
 }
 
 class _GamePageState extends State<GamePage> {
-  final _gameNameController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _gameService = sl<GameService>();
+  bool _isLoading = false;
+  String? _errorMessage;
+  Map<String, dynamic>? _gameData;
 
-  // Role distribution
-  double _villagerCount = 3.0;
-  double _werewolfCount = 1.0;
-  bool _includeSeer = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadGameDetails();
+  }
+
+  Future<void> _loadGameDetails() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Convert gameId to string to ensure compatibility
+      final gameId = widget.gameId.toString();
+      final gameDetails = await _gameService.getGameDetails(gameId);
+      setState(() {
+        _gameData = gameDetails;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _startGame() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final gameId = widget.gameId.toString();
+      final updatedGame = await _gameService.startGame(gameId);
+      setState(() {
+        _gameData = updatedGame;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _shareInvite() {
+    if (_gameData == null) return;
+
+    final gameId = widget.gameId.toString();
+    final inviteLink = _gameService.generateInviteLink(gameId);
+    final whatsAppText = _gameService.generateWhatsAppShareText(
+      gameId,
+      _gameData!['name'] ?? 'Unnamed Game',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.copy),
+                title: const Text('Copy Invite Link'),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: inviteLink));
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invite link copied!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Share via WhatsApp'),
+                onTap: () {
+                  Share.share(whatsAppText);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create New Game'),
+        title: Text(_gameData?['name'] ?? 'Game Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.brightness_6),
-            onPressed: () {
-              context.read<ThemeBloc>().add(ToggleThemeEvent());
-            },
-          ),
+          if (_gameData != null && _gameData!['isGameMaster'] == true)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                // TODO: Navigate to game settings
+              },
+            ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _gameNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Game Name',
-                  prefixIcon: Icon(Icons.gamepad),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a game name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Role Distribution',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildRoleSlider(
-                label: 'Villagers',
-                value: _villagerCount,
-                onChanged: (value) {
-                  setState(() {
-                    _villagerCount = value;
-                  });
-                },
-                min: 3.0,
-                max: 10.0,
-              ),
-              _buildRoleSlider(
-                label: 'Werewolves',
-                value: _werewolfCount,
-                onChanged: (value) {
-                  setState(() {
-                    _werewolfCount = value;
-                  });
-                },
-                min: 1.0,
-                max: 3.0,
-              ),
-              SwitchListTile(
-                title: const Text('Include Seer'),
-                value: _includeSeer,
-                onChanged: (bool value) {
-                  setState(() {
-                    _includeSeer = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _createGame,
-                child: const Text('Create Game'),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadGameDetails,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : _gameData == null
+                  ? const Center(child: Text('No game data available'))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Game Status: ${_gameData!['status']}',
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Players: ${_gameData!['players']?.length ?? 0}',
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (_gameData!['isGameMaster'] == true &&
+                              _gameData!['status'] == 'pending') ...[
+                            ElevatedButton.icon(
+                              onPressed: _shareInvite,
+                              icon: const Icon(Icons.share),
+                              label: const Text('Invite Players'),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _startGame,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start Game'),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Players',
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount:
+                                        _gameData!['players']?.length ?? 0,
+                                    itemBuilder: (context, index) {
+                                      final player = _gameData!['players'][index];
+                                      return ListTile(
+                                        leading: const Icon(Icons.person),
+                                        title: Text(player['name'] ?? ''),
+                                        trailing: player['isGameMaster'] == true
+                                            ? const Chip(
+                                                label: Text('Game Master'),
+                                              )
+                                            : null,
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
     );
-  }
-
-  Widget _buildRoleSlider({
-    required String label,
-    required double value,
-    required void Function(double) onChanged,
-    required double min,
-    required double max,
-  }) {
-    return Column(
-      children: [
-        Text('$label: ${value.round()}'),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).toInt(),
-          label: value.round().toString(),
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-
-  void _createGame() {
-    if (_formKey.currentState!.validate()) {
-      // Prepare custom rules
-      final customRules = {
-        'villagerCount': _villagerCount.round(),
-        'werewolfCount': _werewolfCount.round(),
-        'includeSeer': _includeSeer,
-      };
-
-      // Dispatch game creation event
-      context.read<GameBloc>().add(
-            CreateGameEvent(
-              gameName: _gameNameController.text,
-              userId: 'current_user_id', // TODO: Replace with actual user ID
-            ),
-          );
-
-      // Navigate back or to game lobby
-      Navigator.of(context).pop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _gameNameController.dispose();
-    super.dispose();
   }
 }

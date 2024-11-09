@@ -66,7 +66,7 @@ class CatGameApp extends StatelessWidget {
               '/game': (context) {
                 final gameId =
                     ModalRoute.of(context)?.settings.arguments as String?;
-                return const GamePage();
+                return GamePage(gameId: gameId);
               },
             },
           );

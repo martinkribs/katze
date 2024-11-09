@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/deep_link_service.dart';
+import 'package:katze/core/services/game_service.dart';
 import 'package:katze/core/services/notification_service.dart';
 import 'package:katze/domain/repositories/game_repository.dart';
 import 'package:katze/domain/usecases/create_game.dart';
@@ -29,6 +30,7 @@ Future<void> init() async {
   // Services
   sl.registerLazySingleton(() => NotificationService());
   sl.registerLazySingleton(() => DeepLinkService());
+  sl.registerLazySingleton(() => GameService());
 
   // Repositories
   // Note: You'll need to implement a concrete implementation of GameRepository

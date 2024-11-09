@@ -4,7 +4,7 @@ import 'package:katze/di/injection_container.dart';
 import 'package:katze/presentation/pages/games_overview_page.dart';
 
 class VerificationRequiredPage extends StatefulWidget {
-  const VerificationRequiredPage({Key? key}) : super(key: key);
+  const VerificationRequiredPage({super.key});
 
   @override
   _VerificationRequiredPageState createState() =>

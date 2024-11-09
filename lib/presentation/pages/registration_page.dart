@@ -7,7 +7,7 @@ import 'package:katze/presentation/pages/verification_required_page.dart';
 import 'package:katze/presentation/pages/login_page.dart';
 
 class RegistrationPage extends StatefulWidget {
-  const RegistrationPage({Key? key}) : super(key: key);
+  const RegistrationPage({super.key});
 
   @override
   _RegistrationPageState createState() => _RegistrationPageState();
