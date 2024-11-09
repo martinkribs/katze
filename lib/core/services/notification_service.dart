@@ -1,79 +1,78 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
+  final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  static Future<void> initialize() async {
-    // Initialize platform-specific notification settings
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('app_icon');
+  final _navigationKey = GlobalKey<NavigatorState>();
+  GlobalKey<NavigatorState> get navigationKey => _navigationKey;
 
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-      requestSoundPermission: false,
-      requestBadgePermission: false,
-      requestAlertPermission: false,
+  Future<void> initialize() async {
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
+    await _notifications.initialize(
+      const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
+      onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: _onSelectNotification,
-    );
+    // Request permissions for iOS
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
   }
 
-  static Future<void> showGameNotification({
-    required int id,
+  void _onNotificationTapped(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload != null) {
+      final gameId = payload;
+      _navigationKey.currentState?.pushNamed('/game', arguments: gameId);
+    }
+  }
+
+  Future<void> showGameNotification({
     required String title,
     required String body,
-    String? payload,
+    required String gameId,
   }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'cat_game_channel',
-      'Cat Game Notifications',
+    const androidDetails = AndroidNotificationDetails(
+      'game_channel',
+      'Game Notifications',
+      channelDescription: 'Notifications for game updates',
       importance: Importance.high,
       priority: Priority.high,
     );
 
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails();
-
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
     );
 
-    await flutterLocalNotificationsPlugin.show(
-      id,
+    await _notifications.show(
+      gameId.hashCode,
       title,
       body,
-      platformChannelSpecifics,
-      payload: payload,
+      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: gameId,
     );
-  }
-
-  static Future<void> _onSelectNotification(
-      NotificationResponse notificationResponse) async {
-    // Handle notification tap
-    String? payload = notificationResponse.payload;
-    if (payload != null) {
-      print('Notification payload: $payload');
-      // TODO: Implement navigation logic based on payload
-    }
-  }
-
-  static Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
-  }
-
-  static Future<void> cancelAllNotifications() async {
-    await flutterLocalNotificationsPlugin.cancelAll();
   }
 }

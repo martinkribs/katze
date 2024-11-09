@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:katze/core/services/auth_service.dart';
@@ -23,6 +25,15 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  String _extractErrorMessage(String error) {
+    try {
+      final Map<String, dynamic> errorJson = json.decode(error);
+      return errorJson['message'] ?? error;
+    } catch (e) {
+      return error.replaceAll('Exception: ', '');
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -34,39 +45,39 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // Attempt login
       await _authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      // Check user status
       try {
         await _authService.getCurrentUser();
-        // If getCurrentUser succeeds, user is verified
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const GamesOverviewPage(),
-          ),
-        );
-      } catch (e) {
-        final errorMessage = e.toString();
-        if (errorMessage.contains('verification')) {
-          // User needs to verify email
+        if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const VerificationRequiredPage(),
+              builder: (context) => const GamesOverviewPage(),
             ),
           );
+        }
+      } catch (e) {
+        final errorMessage = _extractErrorMessage(e.toString());
+        if (errorMessage.contains('verified')) {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const VerificationRequiredPage(),
+              ),
+            );
+          }
         } else {
           setState(() {
-            _errorMessage = errorMessage.replaceAll('Exception: ', '');
+            _errorMessage = errorMessage;
           });
         }
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = _extractErrorMessage(e.toString());
       });
     } finally {
       setState(() {
@@ -97,11 +108,13 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Cat Game',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 150,
+                  height: 150,
+                  padding: const EdgeInsets.all(16),
+                  child: Image.asset(
+                    'assets/icon/katze.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
                 if (_errorMessage != null) ...[
@@ -124,7 +137,8 @@ class _LoginPageState extends State<LoginPage> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex =
+                        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                     if (!emailRegex.hasMatch(value)) {
                       return 'Please enter a valid email';
                     }

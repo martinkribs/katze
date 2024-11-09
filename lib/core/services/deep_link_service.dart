@@ -1,80 +1,57 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
-import 'package:uni_links3/uni_links.dart';
+import 'package:app_links/app_links.dart';
+import 'package:flutter/material.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
   factory DeepLinkService() => _instance;
   DeepLinkService._internal();
 
-  StreamSubscription? _subscription;
+  final _appLinks = AppLinks();
+  final _navigationKey = GlobalKey<NavigatorState>();
   final _deepLinkStreamController = StreamController<String>.broadcast();
 
+  GlobalKey<NavigatorState> get navigationKey => _navigationKey;
   Stream<String> get deepLinkStream => _deepLinkStreamController.stream;
 
   Future<void> initialize() async {
-    // Handle initial URI if the app was launched from a deep link
+    // Handle initial link if app was launched from a deep link
     try {
-      final initialUri = await getInitialUri();
+      final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
-        _handleDeepLink(initialUri.toString());
+        _handleDeepLink(initialUri);
       }
-    } on PlatformException {
-      print('Failed to get initial URI');
+    } catch (e) {
+      print('Failed to get initial URI: $e');
     }
 
     // Listen for subsequent deep links
-    _subscription = uriLinkStream.listen((Uri? uri) {
-      if (uri != null) {
-        _handleDeepLink(uri.toString());
-      }
-    }, onError: (err) {
-      print('Failed to handle deep link: $err');
-    });
+    _appLinks.uriLinkStream.listen(
+      (uri) => _handleDeepLink(uri),
+      onError: (e) => print('Deep link error: $e'),
+    );
   }
 
-  void _handleDeepLink(String link) {
-    print('Received deep link: $link');
-    _deepLinkStreamController.add(link);
+  void _handleDeepLink(Uri uri) {
+    if (uri.host == 'game-invite') {
+      final gameId = uri.queryParameters['gameId'];
+      if (gameId != null) {
+        _navigationKey.currentState?.pushNamed('/game', arguments: gameId);
+        _deepLinkStreamController.add(uri.toString());
+      }
+    }
+  }
+
+  static String generateGameInviteLink(String gameId) {
+    if (gameId.isEmpty) {
+      throw ArgumentError('Game ID cannot be empty');
+    }
+    final encodedGameId = Uri.encodeComponent(gameId);
+    return 'katze://game-invite?gameId=$encodedGameId';
   }
 
   void dispose() {
-    _subscription?.cancel();
     _deepLinkStreamController.close();
-  }
-
-  // Helper methods for specific deep link types
-  static String? extractVerificationToken(String link) {
-    try {
-      final uri = Uri.parse(link);
-      if (uri.scheme == 'katze' && uri.host == 'verify-email') {
-        return uri.queryParameters['token'];
-      }
-    } catch (e) {
-      print('Failed to parse verification link: $e');
-    }
-    return null;
-  }
-
-  static String? extractGameInviteToken(String link) {
-    try {
-      final uri = Uri.parse(link);
-      if (uri.scheme == 'katze' && uri.host == 'game-invite') {
-        return uri.queryParameters['token'];
-      }
-    } catch (e) {
-      print('Failed to parse game invite link: $e');
-    }
-    return null;
-  }
-
-  // Generate deep link URLs
-  static String generateVerificationUrl(String token) {
-    return 'katze://verify-email?token=$token';
-  }
-
-  static String generateGameInviteUrl(String token) {
-    return 'katze://game-invite?token=$token';
   }
 }

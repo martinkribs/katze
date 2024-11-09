@@ -7,7 +7,8 @@ class VerificationRequiredPage extends StatefulWidget {
   const VerificationRequiredPage({Key? key}) : super(key: key);
 
   @override
-  _VerificationRequiredPageState createState() => _VerificationRequiredPageState();
+  _VerificationRequiredPageState createState() =>
+      _VerificationRequiredPageState();
 }
 
 class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
@@ -36,7 +37,7 @@ class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
     });
 
     try {
-      final userData = await _authService.getCurrentUser();
+      await _authService.getCurrentUser();
       // If we get user data without error, user is verified
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -45,7 +46,7 @@ class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
       );
     } catch (e) {
       final errorMessage = e.toString();
-      if (!errorMessage.contains('verification')) {
+      if (!errorMessage.contains('verified')) {
         // If error is not about verification, user might be verified
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -104,7 +105,7 @@ class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
               const Icon(
                 Icons.mark_email_unread,
                 size: 64,
-                color: Colors.orange,
+                color: Color(0xFFE7D49E),
               ),
               const SizedBox(height: 24),
               Text(

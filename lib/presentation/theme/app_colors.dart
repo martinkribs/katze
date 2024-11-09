@@ -16,6 +16,10 @@ class AppColors {
     brightness: Brightness.dark,
     scaffoldBackgroundColor: darkBackground,
     primaryColor: darkAccent,
+    colorScheme: const ColorScheme.dark(
+      primary: darkAccent,
+      secondary: darkText,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: darkBackground,
       foregroundColor: darkAccent,
@@ -37,6 +41,12 @@ class AppColors {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: darkAccent),
       ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: darkAccent, width: 2),
+      ),
+      labelStyle: const TextStyle(color: darkText),
+      prefixIconColor: darkAccent,
     ),
   );
 
@@ -45,6 +55,10 @@ class AppColors {
     brightness: Brightness.light,
     scaffoldBackgroundColor: lightBackground,
     primaryColor: lightAccent,
+    colorScheme: const ColorScheme.light(
+      primary: lightAccent,
+      secondary: lightText,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: lightBackground,
       foregroundColor: lightAccent,
@@ -66,6 +80,12 @@ class AppColors {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: lightAccent),
       ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: lightAccent, width: 2),
+      ),
+      labelStyle: const TextStyle(color: lightText),
+      prefixIconColor: lightAccent,
     ),
   );
 }

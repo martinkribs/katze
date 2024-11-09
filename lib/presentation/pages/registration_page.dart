@@ -81,12 +81,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Create Account',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Image.asset(
+                  'assets/icon/katze.png',
+                  height: 120,
+                  width: 120,
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 20),

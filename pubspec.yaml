@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   get_it: ^8.0.2
   flutter_bloc: ^8.1.6
   equatable: ^2.0.5
@@ -22,10 +24,11 @@ dependencies:
   uuid: ^4.5.1
   bloc: ^8.1.4
   flutter_local_notifications: ^18.0.0
-  flutter_launcher_icons: ^0.14.1
-  uni_links3: ^0.5.3
+  app_links: ^6.3.2
+  intl: any
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.1
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
@@ -34,21 +37,27 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
+  assets:
+    - assets/
+    - assets/icon/
 
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true # Changed from "launcher_icon" to true
+  adaptive_icon_background: "#111827" # Added for Android adaptive icon
+  adaptive_icon_foreground: "assets/icon/katze-background.png" # Added for Android adaptive icon
   ios: true
-  image_path: "assets/icon/katze-background.jpg"
+  image_path: "assets/icon/katze-background.png"
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/icon/katze-background.jpg"
+    image_path: "assets/icon/katze-background.png"
     background_color: "#111827"
     theme_color: "#e7d49e"
   windows:
     generate: true
-    image_path: "assets/icon/katze-background.jpg"
+    image_path: "assets/icon/katze-background.png"
     icon_size: 48
   macos:
     generate: true
-    image_path: "assets/icon/katze-background.jpg"
+    image_path: "assets/icon/katze-background.png"

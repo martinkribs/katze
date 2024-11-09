@@ -1,10 +1,11 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static const String _baseUrl = 'http://10.0.2.2:8000/api';
-  
+
   // Keys for storing authentication data
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
@@ -59,7 +60,8 @@ class AuthService {
       await _saveUserData(responseBody);
       return responseBody;
     } else {
-      throw Exception('Registration failed: ${response.body}');
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Registration failed');
     }
   }
 
@@ -85,14 +87,15 @@ class AuthService {
       await _saveUserData(responseBody);
       return responseBody;
     } else {
-      throw Exception('Login failed: ${response.body}');
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Login failed');
     }
   }
 
   // Save user data to SharedPreferences
   Future<void> _saveUserData(Map<String, dynamic> userData) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Save token
     if (userData['token'] != null) {
       await prefs.setString(_tokenKey, userData['token']);
@@ -135,10 +138,11 @@ class AuthService {
       },
     );
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 201) {
       return true;
     } else {
-      throw Exception('Failed to resend verification notification: ${response.body}');
+      throw Exception(
+          'Failed to resend verification notification: ${response.body}');
     }
   }
 
