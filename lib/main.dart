@@ -5,13 +5,15 @@ import 'package:katze/core/services/deep_link_service.dart';
 import 'package:katze/core/services/game_service.dart';
 import 'package:katze/core/services/notification_service.dart';
 import 'package:katze/data/repositories/game_repository.dart';
+import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
 import 'package:katze/presentation/providers/game_provider.dart';
 import 'package:katze/presentation/providers/notification_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
-import 'package:katze/presentation/pages/game_page.dart';
-import 'package:katze/presentation/pages/login_page.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest.dart' as tz;
+
+import 'core/services/auth_state_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,7 @@ void main() async {
   final gameRepository = GameRepository(authService);
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
+  tz.initializeTimeZones();
 
   // Parallel initialisieren für bessere Performance
   await Future.wait([
@@ -73,7 +76,8 @@ class MyApp extends StatelessWidget {
         Provider<AuthService>.value(value: services.authService),
         Provider<GameService>.value(value: services.gameService),
         Provider<DeepLinkService>.value(value: services.deepLinkService),
-        Provider<NotificationService>.value(value: services.notificationService),
+        Provider<NotificationService>.value(
+            value: services.notificationService),
         Provider<GameRepository>.value(value: services.gameRepository),
 
         // State Provider
@@ -81,7 +85,11 @@ class MyApp extends StatelessWidget {
           create: (context) => GameProvider(services.gameRepository),
         ),
         ChangeNotifierProvider(
-          create: (context) => NotificationProvider(services.notificationService),
+          create: (context) => AuthStateManager(AuthService()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) =>
+              NotificationProvider(services.notificationService),
         ),
         ChangeNotifierProvider(
           create: (context) => ThemeProvider(),
@@ -90,6 +98,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
+            debugShowCheckedModeBanner: false,
             navigatorKey: services.deepLinkService.navigationKey,
             title: 'Cat Game',
             localizationsDelegates: const [
@@ -104,9 +113,10 @@ class MyApp extends StatelessWidget {
             theme: themeProvider.themeData,
             initialRoute: '/',
             routes: {
-              '/': (context) => const LoginPage(),
+              '/': (context) => const AuthCheckScreen(),
               '/game': (context) {
-                final gameId = ModalRoute.of(context)?.settings.arguments as String;
+                final gameId =
+                    ModalRoute.of(context)?.settings.arguments as int;
                 return GamePage(gameId: gameId);
               },
               '/verify-email': (context) => const VerificationRequiredPage(),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:katze/core/services/game_service.dart';
 import 'package:katze/presentation/pages/create_game_page.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 enum GameStatus {
   all,
@@ -31,6 +31,10 @@ class GamesOverviewState extends ChangeNotifier {
   String? _errorMessage;
   List<Map<String, dynamic>> _allGames = [];
   Set<GameStatus> _selectedFilters = {GameStatus.all};
+  int _currentPage = 1;
+  int _lastPage = 1;
+  int _perPage = 10;
+  int _totalGames = 0;
 
   GamesOverviewState(this._gameService) {
     loadGames();
@@ -40,13 +44,17 @@ class GamesOverviewState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   Set<GameStatus> get selectedFilters => _selectedFilters;
-  
+  int get currentPage => _currentPage;
+  int get lastPage => _lastPage;
+  int get perPage => _perPage;
+  int get totalGames => _totalGames;
+
   // Filtered games getter
   List<Map<String, dynamic>> get games {
     if (_selectedFilters.contains(GameStatus.all)) {
       return _allGames;
     }
-    
+
     return _allGames.where((game) {
       final status = game['status']?.toLowerCase();
       return _selectedFilters.any((filter) {
@@ -81,14 +89,19 @@ class GamesOverviewState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadGames() async {
+  Future<void> loadGames({int page = 1}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final games = await _gameService.getGames();
-      _allGames = games;
+      final response =
+          await _gameService.getGames(page: page, perPage: _perPage);
+      _allGames = List<Map<String, dynamic>>.from(response['games']);
+      _currentPage = response['meta']['current_page'];
+      _lastPage = response['meta']['last_page'];
+      _perPage = response['meta']['per_page'];
+      _totalGames = response['meta']['total'];
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {
@@ -229,13 +242,11 @@ class _FilterChips extends StatelessWidget {
               label: Text(status.displayName),
               selected: isSelected,
               onSelected: (_) => gamesState.toggleFilter(status),
-              backgroundColor: Colors.grey[200],
-              selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
-              checkmarkColor: Theme.of(context).primaryColor,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              selectedColor: Theme.of(context).primaryColor.withOpacity(0.8),
+              checkmarkColor: Theme.of(context).textTheme.bodyLarge?.color,
               labelStyle: TextStyle(
-                color: isSelected 
-                    ? Theme.of(context).primaryColor
-                    : Theme.of(context).textTheme.bodyLarge?.color,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           );
@@ -258,9 +269,7 @@ class _EmptyGamesView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            hasFilters 
-                ? 'No games match the selected filters'
-                : 'No games yet',
+            hasFilters ? 'No games match the selected filters' : 'No games yet',
             style: const TextStyle(fontSize: 18),
           ),
           const SizedBox(height: 16),
@@ -293,9 +302,23 @@ class _GamesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gamesState = context.watch<GamesOverviewState>();
+
     return ListView.builder(
-      itemCount: games.length,
+      itemCount: games.length + 1,
       itemBuilder: (context, index) {
+        if (index == games.length) {
+          return gamesState.currentPage < gamesState.lastPage
+              ? Center(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        gamesState.loadGames(page: gamesState.currentPage + 1),
+                    child: const Text('Load More'),
+                  ),
+                )
+              : const SizedBox.shrink();
+        }
+
         final game = games[index];
         return Card(
           margin: const EdgeInsets.symmetric(
@@ -305,9 +328,11 @@ class _GamesList extends StatelessWidget {
           child: ListTile(
             title: Text(game['name'] ?? 'Unnamed Game'),
             subtitle: Text(
-              'Players: ${game['players']?.length ?? 0}',
+              'Players: ${game['playerCount'] ?? 0}',
             ),
-            trailing: context.read<GamesOverviewState>().buildGameStatusChip(game['status']),
+            trailing: context
+                .read<GamesOverviewState>()
+                .buildGameStatusChip(game['status']),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(

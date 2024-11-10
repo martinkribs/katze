@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class AppColors {
   // Dark Mode Colors
   static const Color darkBackground = Color(0xFF111827);
+  static const Color darkContrast = Color(0xFF1F2937);
   static const Color darkText = Colors.white;
   static const Color darkAccent = Color(0xFFE7D49E);
 
   // Light Mode Colors
   static const Color lightBackground = Color(0xFFF3F4F6);
+  static const Color lightContrast = Color(0xFFFFFFFF);
   static const Color lightText = Colors.black87;
   static const Color lightAccent = Color(0xFFE7D49E);
 
@@ -34,6 +36,9 @@ class AppColors {
         foregroundColor: darkBackground,
       ),
     ),
+    cardTheme: const CardTheme(
+      color: darkContrast,
+    ),
     inputDecorationTheme: InputDecorationTheme(
       fillColor: darkBackground.withOpacity(0.5),
       filled: true,
@@ -54,6 +59,7 @@ class AppColors {
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     scaffoldBackgroundColor: lightBackground,
+    cardColor: lightContrast,
     primaryColor: lightAccent,
     colorScheme: const ColorScheme.light(
       primary: lightAccent,
@@ -72,6 +78,9 @@ class AppColors {
         backgroundColor: lightAccent,
         foregroundColor: lightBackground,
       ),
+    ),
+    cardTheme: const CardTheme(
+      color: lightContrast,
     ),
     inputDecorationTheme: InputDecorationTheme(
       fillColor: Colors.white,

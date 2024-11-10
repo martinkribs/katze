@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:katze/core/services/auth_service.dart';
 
@@ -8,29 +9,30 @@ class GameService {
 
   GameService(this._authService);
 
-  Future<List<Map<String, dynamic>>> getGames() async {
+  Future<Map<String, dynamic>> getGames(
+      {int page = 1, int perPage = 10}) async {
     final token = await _authService.getToken();
     if (token == null) {
       throw Exception('No authentication token found');
     }
 
     final response = await http.get(
-      Uri.parse('$_baseUrl/games'),
+      Uri.parse('$_baseUrl/games?page=$page&per_page=$perPage'),
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> games = jsonDecode(response.body);
-      return games.cast<Map<String, dynamic>>();
+      return jsonDecode(response.body);
     } else {
       throw Exception('Failed to load games: ${response.body}');
     }
   }
 
-  Future<Map<String, dynamic>> getGameDetails(String gameId) async {
+  Future<Map<String, dynamic>> getGameDetails(int gameId) async {
     final token = await _authService.getToken();
     if (token == null) {
       throw Exception('No authentication token found');
@@ -53,7 +55,9 @@ class GameService {
 
   Future<Map<String, dynamic>> createGame({
     required String name,
-    required Map<String, dynamic> settings,
+    required String description,
+    required bool isPrivate,
+    required String timezone,
   }) async {
     final token = await _authService.getToken();
     if (token == null) {
@@ -69,7 +73,9 @@ class GameService {
       },
       body: jsonEncode({
         'name': name,
-        'settings': settings,
+        'description': description,
+        'is_private': isPrivate,
+        'timezone': timezone,
       }),
     );
 
@@ -106,7 +112,7 @@ class GameService {
     }
   }
 
-  Future<Map<String, dynamic>> startGame(String gameId) async {
+  Future<Map<String, dynamic>> startGame(int gameId) async {
     final token = await _authService.getToken();
     if (token == null) {
       throw Exception('No authentication token found');
@@ -127,11 +133,11 @@ class GameService {
     }
   }
 
-  String generateInviteLink(String gameId) {
+  String generateInviteLink(int gameId) {
     return 'katze://game-invite?id=$gameId';
   }
 
-  String generateWhatsAppShareText(String gameId, String gameName) {
+  String generateWhatsAppShareText(int gameId, String gameName) {
     final inviteLink = generateInviteLink(gameId);
     return 'Join my Cat Game "$gameName"! Click here to join: $inviteLink';
   }

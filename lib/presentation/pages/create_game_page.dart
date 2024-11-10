@@ -1,8 +1,9 @@
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/game_service.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 class CreateGameState extends ChangeNotifier {
   final AuthService _authService;
@@ -11,17 +12,19 @@ class CreateGameState extends ChangeNotifier {
   CreateGameState(this._authService, this._gameService);
 
   Future<void> createGame({
-    required String name, 
-    required String userId,
-    required Map<String, dynamic> settings
+    required String name,
+    required String description,
+    required bool isPrivate,
+    required String timezone,
   }) async {
     try {
       await _gameService.createGame(
-        name: name, 
-        settings: settings
+        name: name,
+        description: description,
+        isPrivate: isPrivate,
+        timezone: timezone,
       );
     } catch (e) {
-      // Handle error, possibly with a method to get error message
       rethrow;
     }
   }
@@ -36,12 +39,28 @@ class CreateGamePage extends StatefulWidget {
 
 class _CreateGamePageState extends State<CreateGamePage> {
   final _gameNameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  String? _selectedTimezone;
+  bool _isPrivate = false;
   final _formKey = GlobalKey<FormState>();
 
-  // Role distribution
-  double _villagerCount = 3.0;
-  double _werewolfCount = 1.0;
-  bool _includeSeer = false;
+  // Filtered list of time zones
+  Future<List<DropdownMenuItem<String>>> _getFilteredTimeZones() async {
+    final filteredTimezones = [
+      'America/New_York',
+      'Europe/Berlin',
+      'Asia/Tokyo',
+      'Australia/Sydney',
+      'America/Los_Angeles',
+      'Africa/Johannesburg'
+    ];
+    return filteredTimezones.map((String timezone) {
+      return DropdownMenuItem<String>(
+        value: timezone,
+        child: Text(timezone),
+      );
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +83,7 @@ class _CreateGamePageState extends State<CreateGamePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _gameNameController,
                 decoration: const InputDecoration(
@@ -77,43 +97,76 @@ class _CreateGamePageState extends State<CreateGamePage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Role Distribution',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(height: 30),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  prefixIcon: Icon(Icons.description),
                 ),
-              ),
-              const SizedBox(height: 10),
-              _buildRoleSlider(
-                label: 'Villagers',
-                value: _villagerCount,
-                onChanged: (value) {
-                  setState(() {
-                    _villagerCount = value;
-                  });
+                validator: (value) {
+                  if (value != null && value.length > 255) {
+                    return 'Description cannot be longer than 255 characters';
+                  }
+                  return null;
                 },
-                min: 3.0,
-                max: 10.0,
               ),
-              _buildRoleSlider(
-                label: 'Werewolves',
-                value: _werewolfCount,
-                onChanged: (value) {
-                  setState(() {
-                    _werewolfCount = value;
-                  });
+              const SizedBox(height: 30),
+              FutureBuilder<List<DropdownMenuItem<String>>>(
+                future: _getFilteredTimeZones(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return const Text('Error loading time zones');
+                  } else {
+                    return DropdownButtonFormField2<String>(
+                      value: _selectedTimezone,
+                      decoration: InputDecoration(
+                        labelText: 'Timezone',
+                        prefixIcon: const Icon(Icons.access_time),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10, horizontal: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      items: snapshot.data,
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _selectedTimezone = newValue;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a timezone';
+                        }
+                        return null;
+                      },
+                      buttonStyleData: const ButtonStyleData(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        height: 60,
+                      ),
+                      dropdownStyleData: DropdownStyleData(
+                        maxHeight: 300,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      menuItemStyleData: const MenuItemStyleData(
+                        height: 48,
+                      ),
+                    );
+                  }
                 },
-                min: 1.0,
-                max: 3.0,
               ),
+              const SizedBox(height: 30),
               SwitchListTile(
-                title: const Text('Include Seer'),
-                value: _includeSeer,
+                title: const Text('Private Game'),
+                value: _isPrivate,
                 onChanged: (bool value) {
                   setState(() {
-                    _includeSeer = value;
+                    _isPrivate = value;
                   });
                 },
               ),
@@ -129,53 +182,18 @@ class _CreateGamePageState extends State<CreateGamePage> {
     );
   }
 
-  Widget _buildRoleSlider({
-    required String label,
-    required double value,
-    required void Function(double) onChanged,
-    required double min,
-    required double max,
-  }) {
-    return Column(
-      children: [
-        Text('$label: ${value.round()}'),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).toInt(),
-          label: value.round().toString(),
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-
   void _createGame() async {
     if (_formKey.currentState!.validate()) {
       try {
-        // Prepare custom rules
-        final customRules = {
-          'villagerCount': _villagerCount.round(),
-          'werewolfCount': _werewolfCount.round(),
-          'includeSeer': _includeSeer,
-        };
+        await context.read<GameService>().createGame(
+              name: _gameNameController.text,
+              description: _descriptionController.text,
+              isPrivate: _isPrivate,
+              timezone: _selectedTimezone!,
+            );
 
-        // Get current user ID from getCurrentUser
-        final userData = await context.read<AuthService>().getCurrentUser();
-        final userId = userData['user']['id'].toString();
-
-        // Use the CreateGameState to create the game
-        await context.read<CreateGameState>().createGame(
-          name: _gameNameController.text,
-          userId: userId,
-          settings: customRules,
-        );
-
-        // Navigate back or to game lobby
-        Navigator.of(context).pop();
+        // Navigate to a different page or show success message
       } catch (e) {
-        // Show error to user
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create game: $e')),
         );
@@ -186,6 +204,7 @@ class _CreateGamePageState extends State<CreateGamePage> {
   @override
   void dispose() {
     _gameNameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 }

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/game_service.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class GameState extends ChangeNotifier {
   final AuthService _authService;
   final GameService _gameService;
-  final String gameId;
+  final int gameId;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -99,7 +98,7 @@ class GameState extends ChangeNotifier {
 }
 
 class GamePage extends StatelessWidget {
-  final String gameId;
+  final int gameId;
 
   const GamePage({
     super.key,
@@ -130,8 +129,8 @@ class _GameView extends StatelessWidget {
       appBar: AppBar(
         title: Text(gameState.gameData?['name'] ?? 'Game Details'),
         actions: [
-          if (gameState.gameData != null && 
-              gameState.gameData!['isGameMaster'] == true)
+          if (gameState.gameData != null &&
+              gameState.gameData!['isGameMaster'] == 1)
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: () {
@@ -174,13 +173,15 @@ class _GameView extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Game Status: ${gameState.gameData!['status']}',
-                                    style: Theme.of(context).textTheme.titleLarge,
+                                    'Game Status: ${gameState.gameData!['gameStatus']}',
+                                    style:
+                                        Theme.of(context).textTheme.titleLarge,
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Players: ${gameState.gameData!['players']?.length ?? 0}',
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
                                   ),
                                 ],
                               ),
@@ -188,7 +189,8 @@ class _GameView extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
                           if (gameState.gameData!['isGameMaster'] == true &&
-                              gameState.gameData!['status'] == 'pending') ...[
+                              gameState.gameData!['gameStatus'] ==
+                                  'pending') ...[
                             ElevatedButton.icon(
                               onPressed: () => gameState.shareInvite(context),
                               icon: const Icon(Icons.share),
@@ -210,20 +212,24 @@ class _GameView extends StatelessWidget {
                                 children: [
                                   Text(
                                     'Players',
-                                    style: Theme.of(context).textTheme.titleLarge,
+                                    style:
+                                        Theme.of(context).textTheme.titleLarge,
                                   ),
                                   const SizedBox(height: 8),
                                   ListView.builder(
                                     shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount:
-                                        gameState.gameData!['players']?.length ?? 0,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: gameState
+                                            .gameData!['players']?.length ??
+                                        0,
                                     itemBuilder: (context, index) {
-                                      final player = gameState.gameData!['players'][index];
+                                      final player =
+                                          gameState.gameData!['players'][index];
                                       return ListTile(
                                         leading: const Icon(Icons.person),
                                         title: Text(player['name'] ?? ''),
-                                        trailing: player['isGameMaster'] == true
+                                        trailing: player['isGameMaster'] == 1
                                             ? const Chip(
                                                 label: Text('Game Master'),
                                               )
