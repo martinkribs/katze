@@ -1,29 +1,29 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
-import 'package:katze/di/injection_container.dart';
-import 'package:katze/presentation/bloc/theme/theme_bloc.dart';
 import 'package:katze/presentation/pages/games_overview_page.dart';
 import 'package:katze/presentation/pages/registration_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
-  @override
-  _LoginPageState createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> {
+class LoginState extends ChangeNotifier {
+  final AuthService _authService;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final _authService = sl<AuthService>();
 
   bool _isLoading = false;
   String? _errorMessage;
+
+  LoginState(this._authService);
+
+  // Getters
+  TextEditingController get emailController => _emailController;
+  TextEditingController get passwordController => _passwordController;
+  GlobalKey<FormState> get formKey => _formKey;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   String _extractErrorMessage(String error) {
     try {
@@ -34,15 +34,14 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _login() async {
+  Future<void> login(BuildContext context) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
       await _authService.login(
@@ -52,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
 
       try {
         await _authService.getCurrentUser();
-        if (mounted) {
+        if (context.mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const GamesOverviewPage(),
@@ -62,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
       } catch (e) {
         final errorMessage = _extractErrorMessage(e.toString());
         if (errorMessage.contains('verified')) {
-          if (mounted) {
+          if (context.mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => const VerificationRequiredPage(),
@@ -70,24 +69,46 @@ class _LoginPageState extends State<LoginPage> {
             );
           }
         } else {
-          setState(() {
-            _errorMessage = errorMessage;
-          });
+          _errorMessage = errorMessage;
+          notifyListeners();
         }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = _extractErrorMessage(e.toString());
-      });
+      _errorMessage = _extractErrorMessage(e.toString());
+      notifyListeners();
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+}
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
+
+  @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => LoginState(context.read<AuthService>()),
+      child: const _LoginView(),
+    );
+  }
+}
+
+class _LoginView extends StatelessWidget {
+  const _LoginView();
+
+  @override
+  Widget build(BuildContext context) {
+    final loginState = context.watch<LoginState>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Login'),
@@ -95,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
           IconButton(
             icon: const Icon(Icons.brightness_6),
             onPressed: () {
-              context.read<ThemeBloc>().add(ToggleThemeEvent());
+              context.read<ThemeProvider>().toggleTheme();
             },
           ),
         ],
@@ -104,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Form(
-            key: _formKey,
+            key: loginState.formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -117,17 +138,17 @@ class _LoginPageState extends State<LoginPage> {
                     fit: BoxFit.contain,
                   ),
                 ),
-                if (_errorMessage != null) ...[
+                if (loginState.errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
-                    _errorMessage!,
+                    loginState.errorMessage!,
                     style: const TextStyle(color: Colors.red),
                     textAlign: TextAlign.center,
                   ),
                 ],
                 const SizedBox(height: 30),
                 TextFormField(
-                  controller: _emailController,
+                  controller: loginState.emailController,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email),
@@ -137,8 +158,7 @@ class _LoginPageState extends State<LoginPage> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    final emailRegex =
-                        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                     if (!emailRegex.hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
@@ -147,7 +167,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
-                  controller: _passwordController,
+                  controller: loginState.passwordController,
                   decoration: const InputDecoration(
                     labelText: 'Password',
                     prefixIcon: Icon(Icons.lock),
@@ -164,10 +184,10 @@ class _LoginPageState extends State<LoginPage> {
                   },
                 ),
                 const SizedBox(height: 30),
-                _isLoading
+                loginState.isLoading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
-                        onPressed: _login,
+                        onPressed: () => loginState.login(context),
                         child: const Text('Login'),
                       ),
                 const SizedBox(height: 20),
@@ -187,12 +207,5 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 }

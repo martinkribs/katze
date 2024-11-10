@@ -1,125 +1,138 @@
 import 'dart:convert';
-
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  final _storage = const FlutterSecureStorage();
 
   // Keys for storing authentication data
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
   static const String _userNameKey = 'user_name';
   static const String _userEmailKey = 'user_email';
+  static const String _refreshTokenKey = 'refresh_token';
 
-  // Get current user data
+  // Encryption key for additional security (you should generate this securely)
+  static const _encryptionKey = 'your_secure_encryption_key';
+
+  // Storage options with encryption
+  final _secureOptions = const AndroidOptions(
+    encryptedSharedPreferences: true,
+    keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
+    storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+  );
+
+  // Get current user data with token refresh handling
   Future<Map<String, dynamic>> getCurrentUser() async {
     final token = await getToken();
     if (token == null) {
-      throw Exception('No authentication token found');
+      throw const AuthException('No authentication token found');
     }
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/user'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/user'),
+        headers: _getAuthHeaders(token),
+      );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Failed to get user data');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final newToken = await _refreshToken();
+        if (newToken != null) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$_baseUrl/user'),
+            headers: _getAuthHeaders(newToken),
+          );
+          if (retryResponse.statusCode == 200) {
+            return jsonDecode(retryResponse.body);
+          }
+        }
+        throw const AuthException('Session expired, please login again');
+      } else {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Failed to get user data');
+      }
+    } catch (e) {
+      throw AuthException('Network error: ${e.toString()}');
     }
   }
 
-  // Registration method
+  // Registration with input validation
   Future<Map<String, dynamic>> register({
     required String name,
     required String email,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/register'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'name': name,
-        'email': email,
-        'password': password,
-        'password_confirmation': password,
-      }),
-    );
+    // Validate input
+    if (!_isValidEmail(email)) {
+      throw const AuthException('Invalid email format');
+    }
+    if (!_isStrongPassword(password)) {
+      throw const AuthException(
+          'Password must be at least 8 characters long and contain numbers, letters, and special characters');
+    }
 
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final responseBody = jsonDecode(response.body);
-      await _saveUserData(responseBody);
-      return responseBody;
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Registration failed');
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/register'),
+        headers: _getBaseHeaders(),
+        body: jsonEncode({
+          'name': name,
+          'email': email,
+          'password': password,
+          'password_confirmation': password,
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        await _saveUserData(responseBody);
+        return responseBody;
+      } else {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Registration failed');
+      }
+    } catch (e) {
+      throw AuthException('Registration failed: ${e.toString()}');
     }
   }
 
-  // Login method
+  // Secure login with rate limiting
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/login'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final responseBody = jsonDecode(response.body);
-      await _saveUserData(responseBody);
-      return responseBody;
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Login failed');
-    }
-  }
-
-  // Save user data to SharedPreferences
-  Future<void> _saveUserData(Map<String, dynamic> userData) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Save token
-    if (userData['token'] != null) {
-      await prefs.setString(_tokenKey, userData['token']);
+    if (await _isRateLimited()) {
+      throw const AuthException('Too many login attempts. Please try again later.');
     }
 
-    // Save user details
-    final user = userData['user'] ?? userData;
-    if (user != null) {
-      await prefs.setInt(_userIdKey, user['id']);
-      await prefs.setString(_userNameKey, user['name']);
-      await prefs.setString(_userEmailKey, user['email']);
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/login'),
+        headers: _getBaseHeaders(),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        await _saveUserData(responseBody);
+        await _resetLoginAttempts();
+        return responseBody;
+      } else {
+        await _incrementLoginAttempts();
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Login failed');
+      }
+    } catch (e) {
+      throw AuthException('Login failed: ${e.toString()}');
     }
-  }
-
-  // Get current authentication token
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
-  }
-
-  // Check if user is logged in
-  Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey) != null;
   }
 
   // Resend verification notification
@@ -146,18 +159,191 @@ class AuthService {
     }
   }
 
-  // Method to get current user's email
-  Future<String?> getCurrentUserEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_userEmailKey);
+  // Save user data securely
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+    // Save token securely
+    if (userData['token'] != null) {
+      await _storage.write(
+        key: _tokenKey,
+        value: userData['token'],
+        aOptions: _secureOptions,
+      );
+    }
+
+    if (userData['refresh_token'] != null) {
+      await _storage.write(
+        key: _refreshTokenKey,
+        value: userData['refresh_token'],
+        aOptions: _secureOptions,
+      );
+    }
+
+    // Save user details securely
+    final user = userData['user'] ?? userData;
+    if (user != null) {
+      await _storage.write(
+        key: _userIdKey,
+        value: user['id'].toString(),
+        aOptions: _secureOptions,
+      );
+      await _storage.write(
+        key: _userNameKey,
+        value: user['name'],
+        aOptions: _secureOptions,
+      );
+      await _storage.write(
+        key: _userEmailKey,
+        value: user['email'],
+        aOptions: _secureOptions,
+      );
+    }
   }
 
-  // Logout method
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_userIdKey);
-    await prefs.remove(_userNameKey);
-    await prefs.remove(_userEmailKey);
+  // Secure token refresh
+  Future<String?> _refreshToken() async {
+    final refreshToken = await _storage.read(
+      key: _refreshTokenKey,
+      aOptions: _secureOptions,
+    );
+    if (refreshToken == null) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/refresh'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $refreshToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        await _saveUserData(responseBody);
+        return responseBody['token'];
+      }
+    } catch (e) {
+      print('Token refresh failed: ${e.toString()}');
+    }
+    return null;
   }
+
+  // Helper methods
+  Map<String, String> _getBaseHeaders() => {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+
+  Map<String, String> _getAuthHeaders(String token) => {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  bool _isStrongPassword(String password) {
+    return password.length >= 8 &&
+        RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]')
+            .hasMatch(password);
+  }
+
+  // Rate limiting implementation
+  Future<bool> _isRateLimited() async {
+    final attempts = await _storage.read(
+          key: 'login_attempts',
+          aOptions: _secureOptions,
+        ) ??
+        '0';
+    final lastAttempt = await _storage.read(
+          key: 'last_attempt_time',
+          aOptions: _secureOptions,
+        ) ??
+        '0';
+
+    final currentTime = DateTime.now().millisecondsSinceEpoch;
+    if (currentTime - int.parse(lastAttempt) > 300000) {
+      // Reset after 5 minutes
+      await _resetLoginAttempts();
+      return false;
+    }
+
+    return int.parse(attempts) >= 5;
+  }
+
+  Future<void> _incrementLoginAttempts() async {
+    final attempts = await _storage.read(
+          key: 'login_attempts',
+          aOptions: _secureOptions,
+        ) ??
+        '0';
+    await _storage.write(
+      key: 'login_attempts',
+      value: (int.parse(attempts) + 1).toString(),
+      aOptions: _secureOptions,
+    );
+    await _storage.write(
+      key: 'last_attempt_time',
+      value: DateTime.now().millisecondsSinceEpoch.toString(),
+      aOptions: _secureOptions,
+    );
+  }
+
+  Future<void> _resetLoginAttempts() async {
+    await _storage.write(
+      key: 'login_attempts',
+      value: '0',
+      aOptions: _secureOptions,
+    );
+    await _storage.write(
+      key: 'last_attempt_time',
+      value: '0',
+      aOptions: _secureOptions,
+    );
+  }
+
+  // Secure logout
+  Future<void> logout() async {
+    final token = await getToken();
+    if (token != null) {
+      try {
+        // Call logout endpoint if available
+        await http.post(
+          Uri.parse('$_baseUrl/logout'),
+          headers: _getAuthHeaders(token),
+        );
+      } catch (e) {
+        print('Logout endpoint failed: ${e.toString()}');
+      }
+    }
+    
+    // Clear all secure storage
+    await _storage.deleteAll(aOptions: _secureOptions);
+  }
+
+  // Get current authentication token
+  Future<String?> getToken() async {
+    return await _storage.read(key: _tokenKey, aOptions: _secureOptions);
+  }
+
+  // Check if user is logged in
+  Future<bool> isLoggedIn() async {
+    final token = await getToken();
+    return token != null;
+  }
+
+  // Method to get current user's email
+  Future<String?> getCurrentUserEmail() async {
+    return await _storage.read(key: _userEmailKey, aOptions: _secureOptions);
+  }
+}
+
+// Custom exception for authentication errors
+class AuthException implements Exception {
+  final String message;
+  const AuthException(this.message);
+
+  @override
+  String toString() => message;
 }

@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:katze/core/services/auth_service.dart';
 
-class GameService {
+class GameRepository {
   static const String _baseUrl = 'http://10.0.2.2:8000/api';
   final AuthService _authService;
 
-  GameService(this._authService);
+  GameRepository(this._authService);
 
   Future<List<Map<String, dynamic>>> getGames() async {
     final token = await _authService.getToken();
@@ -25,6 +25,8 @@ class GameService {
     if (response.statusCode == 200) {
       final List<dynamic> games = jsonDecode(response.body);
       return games.cast<Map<String, dynamic>>();
+    } else if (response.statusCode == 404) {
+      throw Exception('API endpoint not found. Please ensure the backend service is running and configured correctly.');
     } else {
       throw Exception('Failed to load games: ${response.body}');
     }
@@ -46,6 +48,8 @@ class GameService {
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('Game not found or API endpoint not available. Please check the game ID and backend service.');
     } else {
       throw Exception('Failed to load game details: ${response.body}');
     }
@@ -75,6 +79,8 @@ class GameService {
 
     if (response.statusCode == 201) {
       return jsonDecode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('API endpoint not found. Please ensure the backend service is running and configured correctly.');
     } else {
       throw Exception('Failed to create game: ${response.body}');
     }
@@ -101,6 +107,8 @@ class GameService {
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('Game not found or API endpoint not available. Please check the game ID and backend service.');
     } else {
       throw Exception('Failed to update game settings: ${response.body}');
     }
@@ -122,6 +130,8 @@ class GameService {
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('Game not found or API endpoint not available. Please check the game ID and backend service.');
     } else {
       throw Exception('Failed to start game: ${response.body}');
     }

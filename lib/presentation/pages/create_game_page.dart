@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:katze/presentation/bloc/game/game_bloc.dart';
-import 'package:katze/presentation/bloc/theme/theme_bloc.dart';
+import 'package:provider/provider.dart';
+import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/core/services/game_service.dart';
+import 'package:katze/presentation/providers/theme_provider.dart';
+
+class CreateGameState extends ChangeNotifier {
+  final AuthService _authService;
+  final GameService _gameService;
+
+  CreateGameState(this._authService, this._gameService);
+
+  Future<void> createGame({
+    required String name, 
+    required String userId,
+    required Map<String, dynamic> settings
+  }) async {
+    try {
+      await _gameService.createGame(
+        name: name, 
+        settings: settings
+      );
+    } catch (e) {
+      // Handle error, possibly with a method to get error message
+      rethrow;
+    }
+  }
+}
 
 class CreateGamePage extends StatefulWidget {
   const CreateGamePage({super.key});
@@ -28,7 +52,7 @@ class _CreateGamePageState extends State<CreateGamePage> {
           IconButton(
             icon: const Icon(Icons.brightness_6),
             onPressed: () {
-              context.read<ThemeBloc>().add(ToggleThemeEvent());
+              context.read<ThemeProvider>().toggleTheme();
             },
           ),
         ],
@@ -127,25 +151,35 @@ class _CreateGamePageState extends State<CreateGamePage> {
     );
   }
 
-  void _createGame() {
+  void _createGame() async {
     if (_formKey.currentState!.validate()) {
-      // Prepare custom rules
-      final customRules = {
-        'villagerCount': _villagerCount.round(),
-        'werewolfCount': _werewolfCount.round(),
-        'includeSeer': _includeSeer,
-      };
+      try {
+        // Prepare custom rules
+        final customRules = {
+          'villagerCount': _villagerCount.round(),
+          'werewolfCount': _werewolfCount.round(),
+          'includeSeer': _includeSeer,
+        };
 
-      // Dispatch game creation event
-      context.read<GameBloc>().add(
-        CreateGameEvent(
-          gameName: _gameNameController.text,
-          userId: 'current_user_id', // TODO: Replace with actual user ID
-        ),
-      );
+        // Get current user ID from getCurrentUser
+        final userData = await context.read<AuthService>().getCurrentUser();
+        final userId = userData['user']['id'].toString();
 
-      // Navigate back or to game lobby
-      Navigator.of(context).pop();
+        // Use the CreateGameState to create the game
+        await context.read<CreateGameState>().createGame(
+          name: _gameNameController.text,
+          userId: userId,
+          settings: customRules,
+        );
+
+        // Navigate back or to game lobby
+        Navigator.of(context).pop();
+      } catch (e) {
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create game: $e')),
+        );
+      }
     }
   }
 

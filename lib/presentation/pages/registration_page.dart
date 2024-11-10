@@ -1,75 +1,101 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
-import 'package:katze/di/injection_container.dart';
-import 'package:katze/presentation/bloc/theme/theme_bloc.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
 import 'package:katze/presentation/pages/login_page.dart';
+import 'package:katze/presentation/providers/theme_provider.dart';
 
-class RegistrationPage extends StatefulWidget {
+// State Management für Registration
+class RegistrationState extends ChangeNotifier {
+  final AuthService _authService;
+  bool isLoading = false;
+  String? errorMessage;
+
+  RegistrationState(this._authService);
+
+  Future<bool> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.register(
+        name: name,
+        email: email,
+        password: password,
+      );
+      return true;
+    } catch (e) {
+      errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+
+class RegistrationPage extends StatelessWidget {
   const RegistrationPage({super.key});
 
   @override
-  _RegistrationPageState createState() => _RegistrationPageState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => RegistrationState(context.read<AuthService>()),
+      child: const _RegistrationView(),
+    );
+  }
 }
 
-class _RegistrationPageState extends State<RegistrationPage> {
+class _RegistrationView extends StatefulWidget {
+  const _RegistrationView();
+
+  @override
+  _RegistrationViewState createState() => _RegistrationViewState();
+}
+
+class _RegistrationViewState extends State<_RegistrationView> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final _authService = sl<AuthService>();
-
-  bool _isLoading = false;
-  String? _errorMessage;
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    final state = context.read<RegistrationState>();
+    final success = await state.register(
+      name: _usernameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
-    try {
-      // Attempt registration
-      await _authService.register(
-        name: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-
-      // Navigate to verification page
+    if (success && mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => const VerificationRequiredPage(),
         ),
       );
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<RegistrationState>();
+    final themeProvider = context.watch<ThemeProvider>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Register'),
         actions: [
           IconButton(
             icon: const Icon(Icons.brightness_6),
-            onPressed: () {
-              context.read<ThemeBloc>().add(ToggleThemeEvent());
-            },
+            onPressed: () => themeProvider.toggleTheme(),
           ),
         ],
       ),
@@ -86,85 +112,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   height: 120,
                   width: 120,
                 ),
-                if (_errorMessage != null) ...[
+                if (state.errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
-                    _errorMessage!,
+                    state.errorMessage!,
                     style: const TextStyle(color: Colors.red),
                     textAlign: TextAlign.center,
                   ),
                 ],
                 const SizedBox(height: 30),
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a username';
-                    }
-                    if (value.length < 3) {
-                      return 'Username must be at least 3 characters';
-                    }
-                    return null;
-                  },
-                ),
+                _buildUsernameField(),
                 const SizedBox(height: 20),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
+                _buildEmailField(),
                 const SizedBox(height: 20),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
+                _buildPasswordField(),
                 const SizedBox(height: 20),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
+                _buildConfirmPasswordField(),
                 const SizedBox(height: 30),
-                _isLoading
+                state.isLoading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
                         onPressed: _register,
@@ -186,6 +151,83 @@ class _RegistrationPageState extends State<RegistrationPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUsernameField() {
+    return TextFormField(
+      controller: _usernameController,
+      decoration: const InputDecoration(
+        labelText: 'Username',
+        prefixIcon: Icon(Icons.person),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter a username';
+        }
+        if (value.length < 3) {
+          return 'Username must be at least 3 characters';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildEmailField() {
+    return TextFormField(
+      controller: _emailController,
+      decoration: const InputDecoration(
+        labelText: 'Email',
+        prefixIcon: Icon(Icons.email),
+      ),
+      keyboardType: TextInputType.emailAddress,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your email';
+        }
+        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+        if (!emailRegex.hasMatch(value)) {
+          return 'Please enter a valid email';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return TextFormField(
+      controller: _passwordController,
+      decoration: const InputDecoration(
+        labelText: 'Password',
+        prefixIcon: Icon(Icons.lock),
+      ),
+      obscureText: true,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter a password';
+        }
+        if (value.length < 6) {
+          return 'Password must be at least 6 characters';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildConfirmPasswordField() {
+    return TextFormField(
+      controller: _confirmPasswordController,
+      decoration: const InputDecoration(
+        labelText: 'Confirm Password',
+        prefixIcon: Icon(Icons.lock_outline),
+      ),
+      obscureText: true,
+      validator: (value) {
+        if (value != _passwordController.text) {
+          return 'Passwords do not match';
+        }
+        return null;
+      },
     );
   }
 

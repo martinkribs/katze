@@ -1,84 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:katze/core/services/game_service.dart';
-import 'package:katze/di/injection_container.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-class GamePage extends StatefulWidget {
-  final dynamic gameId;
+import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/core/services/game_service.dart';
 
-  const GamePage({
-    super.key,
-    required this.gameId,
-  });
+class GameState extends ChangeNotifier {
+  final AuthService _authService;
+  final GameService _gameService;
+  final String gameId;
 
-  @override
-  _GamePageState createState() => _GamePageState();
-}
-
-class _GamePageState extends State<GamePage> {
-  final _gameService = sl<GameService>();
   bool _isLoading = false;
   String? _errorMessage;
   Map<String, dynamic>? _gameData;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadGameDetails();
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+  Map<String, dynamic>? get gameData => _gameData;
+
+  GameState(this._authService, this._gameService, this.gameId) {
+    loadGameDetails();
   }
 
-  Future<void> _loadGameDetails() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> loadGameDetails() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
-      // Convert gameId to string to ensure compatibility
-      final gameId = widget.gameId.toString();
       final gameDetails = await _gameService.getGameDetails(gameId);
-      setState(() {
-        _gameData = gameDetails;
-      });
+      _gameData = gameDetails;
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> _startGame() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> startGame() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
-      final gameId = widget.gameId.toString();
       final updatedGame = await _gameService.startGame(gameId);
-      setState(() {
-        _gameData = updatedGame;
-      });
+      _gameData = updatedGame;
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  void _shareInvite() {
+  void shareInvite(BuildContext context) {
     if (_gameData == null) return;
 
-    final gameId = widget.gameId.toString();
     final inviteLink = _gameService.generateInviteLink(gameId);
     final whatsAppText = _gameService.generateWhatsAppShareText(
       gameId,
@@ -117,14 +96,42 @@ class _GamePageState extends State<GamePage> {
       },
     );
   }
+}
+
+class GamePage extends StatelessWidget {
+  final String gameId;
+
+  const GamePage({
+    super.key,
+    required this.gameId,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => GameState(
+        context.read<AuthService>(),
+        context.read<GameService>(),
+        gameId,
+      ),
+      child: const _GameView(),
+    );
+  }
+}
+
+class _GameView extends StatelessWidget {
+  const _GameView();
+
+  @override
+  Widget build(BuildContext context) {
+    final gameState = context.watch<GameState>();
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_gameData?['name'] ?? 'Game Details'),
+        title: Text(gameState.gameData?['name'] ?? 'Game Details'),
         actions: [
-          if (_gameData != null && _gameData!['isGameMaster'] == true)
+          if (gameState.gameData != null && 
+              gameState.gameData!['isGameMaster'] == true)
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: () {
@@ -133,27 +140,27 @@ class _GamePageState extends State<GamePage> {
             ),
         ],
       ),
-      body: _isLoading
+      body: gameState.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
+          : gameState.errorMessage != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _errorMessage!,
+                        gameState.errorMessage!,
                         style: const TextStyle(color: Colors.red),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _loadGameDetails,
+                        onPressed: gameState.loadGameDetails,
                         child: const Text('Retry'),
                       ),
                     ],
                   ),
                 )
-              : _gameData == null
+              : gameState.gameData == null
                   ? const Center(child: Text('No game data available'))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16.0),
@@ -167,12 +174,12 @@ class _GamePageState extends State<GamePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Game Status: ${_gameData!['status']}',
+                                    'Game Status: ${gameState.gameData!['status']}',
                                     style: Theme.of(context).textTheme.titleLarge,
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Players: ${_gameData!['players']?.length ?? 0}',
+                                    'Players: ${gameState.gameData!['players']?.length ?? 0}',
                                     style: Theme.of(context).textTheme.titleMedium,
                                   ),
                                 ],
@@ -180,16 +187,16 @@ class _GamePageState extends State<GamePage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          if (_gameData!['isGameMaster'] == true &&
-                              _gameData!['status'] == 'pending') ...[
+                          if (gameState.gameData!['isGameMaster'] == true &&
+                              gameState.gameData!['status'] == 'pending') ...[
                             ElevatedButton.icon(
-                              onPressed: _shareInvite,
+                              onPressed: () => gameState.shareInvite(context),
                               icon: const Icon(Icons.share),
                               label: const Text('Invite Players'),
                             ),
                             const SizedBox(height: 8),
                             ElevatedButton.icon(
-                              onPressed: _startGame,
+                              onPressed: gameState.startGame,
                               icon: const Icon(Icons.play_arrow),
                               label: const Text('Start Game'),
                             ),
@@ -210,9 +217,9 @@ class _GamePageState extends State<GamePage> {
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),
                                     itemCount:
-                                        _gameData!['players']?.length ?? 0,
+                                        gameState.gameData!['players']?.length ?? 0,
                                     itemBuilder: (context, index) {
-                                      final player = _gameData!['players'][index];
+                                      final player = gameState.gameData!['players'][index];
                                       return ListTile(
                                         leading: const Icon(Icons.person),
                                         title: Text(player['name'] ?? ''),

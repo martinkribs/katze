@@ -1,97 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
-import 'package:katze/di/injection_container.dart';
 import 'package:katze/presentation/pages/games_overview_page.dart';
 
-class VerificationRequiredPage extends StatefulWidget {
-  const VerificationRequiredPage({super.key});
+// Erstellen eines VerificationState
+class VerificationState extends ChangeNotifier {
+  final AuthService _authService;
+  bool isLoading = false;
+  String? errorMessage;
+  String? email;
 
-  @override
-  _VerificationRequiredPageState createState() =>
-      _VerificationRequiredPageState();
-}
-
-class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
-  final _authService = sl<AuthService>();
-  bool _isLoading = false;
-  String? _errorMessage;
-  String? _email;
-
-  @override
-  void initState() {
-    super.initState();
+  VerificationState(this._authService) {
     _loadUserEmail();
   }
 
   Future<void> _loadUserEmail() async {
-    final email = await _authService.getCurrentUserEmail();
-    setState(() {
-      _email = email;
-    });
+    email = await _authService.getCurrentUserEmail();
+    notifyListeners();
   }
 
-  Future<void> _checkVerificationStatus() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> checkVerificationStatus(BuildContext context) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
 
     try {
       await _authService.getCurrentUser();
-      // If we get user data without error, user is verified
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const GamesOverviewPage(),
-        ),
-      );
-    } catch (e) {
-      final errorMessage = e.toString();
-      if (!errorMessage.contains('verified')) {
-        // If error is not about verification, user might be verified
+      // Wenn kein Fehler auftritt, ist der User verifiziert
+      if (context.mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const GamesOverviewPage(),
           ),
         );
+      }
+    } catch (e) {
+      final error = e.toString();
+      if (!error.contains('verified')) {
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const GamesOverviewPage(),
+            ),
+          );
+        }
       } else {
-        setState(() {
-          _errorMessage = 'Email not yet verified. Please check your email.';
-        });
+        errorMessage = 'Email not yet verified. Please check your email.';
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      isLoading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> _resendVerification() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> resendVerification(BuildContext context) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
 
     try {
       await _authService.resendVerificationNotification();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verification email sent'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verification email sent'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      isLoading = false;
+      notifyListeners();
     }
   }
+}
+
+class VerificationRequiredPage extends StatelessWidget {
+  const VerificationRequiredPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => VerificationState(context.read<AuthService>()),
+      child: const _VerificationRequiredView(),
+    );
+  }
+}
+
+class _VerificationRequiredView extends StatelessWidget {
+  const _VerificationRequiredView();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<VerificationState>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Email Verification Required'),
@@ -114,32 +118,32 @@ class _VerificationRequiredPageState extends State<VerificationRequiredPage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              if (_email != null)
+              if (state.email != null)
                 Text(
-                  'We sent a verification email to:\n$_email',
+                  'We sent a verification email to:\n${state.email}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               const SizedBox(height: 24),
-              if (_errorMessage != null)
+              if (state.errorMessage != null)
                 Text(
-                  _errorMessage!,
+                  state.errorMessage!,
                   style: const TextStyle(color: Colors.red),
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 24),
-              if (_isLoading)
+              if (state.isLoading)
                 const CircularProgressIndicator()
               else
                 Column(
                   children: [
                     ElevatedButton(
-                      onPressed: _checkVerificationStatus,
+                      onPressed: () => state.checkVerificationStatus(context),
                       child: const Text('I have verified my email'),
                     ),
                     const SizedBox(height: 16),
                     TextButton(
-                      onPressed: _resendVerification,
+                      onPressed: () => state.resendVerification(context),
                       child: const Text('Resend Verification Email'),
                     ),
                   ],

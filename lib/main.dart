@@ -1,54 +1,96 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/deep_link_service.dart';
+import 'package:katze/core/services/game_service.dart';
 import 'package:katze/core/services/notification_service.dart';
-import 'package:katze/di/injection_container.dart' as di;
-import 'package:katze/presentation/bloc/game/game_bloc.dart';
-import 'package:katze/presentation/bloc/notification/notification_bloc.dart';
-import 'package:katze/presentation/bloc/theme/theme_bloc.dart';
+import 'package:katze/data/repositories/game_repository.dart';
+import 'package:katze/presentation/pages/verification_required_page.dart';
+import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/providers/notification_provider.dart';
+import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/login_page.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize dependency injection
-  await di.init();
-
-  // Initialize services
+  // Services initialisieren
+  final authService = AuthService();
+  final gameService = GameService(authService);
+  final gameRepository = GameRepository(authService);
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
 
+  // Parallel initialisieren für bessere Performance
   await Future.wait([
     deepLinkService.initialize(),
     notificationService.initialize(),
   ]);
 
-  runApp(const CatGameApp());
+  runApp(MyApp(
+    services: AppServices(
+      deepLinkService: deepLinkService,
+      notificationService: notificationService,
+      authService: authService,
+      gameService: gameService,
+      gameRepository: gameRepository,
+    ),
+  ));
 }
 
-class CatGameApp extends StatelessWidget {
-  const CatGameApp({super.key});
+// Neue Klasse für bessere Organisation der Services
+class AppServices {
+  final DeepLinkService deepLinkService;
+  final NotificationService notificationService;
+  final AuthService authService;
+  final GameService gameService;
+  final GameRepository gameRepository;
+
+  const AppServices({
+    required this.deepLinkService,
+    required this.notificationService,
+    required this.authService,
+    required this.gameService,
+    required this.gameRepository,
+  });
+}
+
+class MyApp extends StatelessWidget {
+  final AppServices services;
+
+  const MyApp({
+    super.key,
+    required this.services,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiProvider(
       providers: [
-        BlocProvider<GameBloc>(
-          create: (context) => di.sl<GameBloc>(),
+        // Services
+        Provider<AuthService>.value(value: services.authService),
+        Provider<GameService>.value(value: services.gameService),
+        Provider<DeepLinkService>.value(value: services.deepLinkService),
+        Provider<NotificationService>.value(value: services.notificationService),
+        Provider<GameRepository>.value(value: services.gameRepository),
+
+        // State Provider
+        ChangeNotifierProvider(
+          create: (context) => GameProvider(services.gameRepository),
         ),
-        BlocProvider<NotificationBloc>(
-          create: (context) => di.sl<NotificationBloc>(),
+        ChangeNotifierProvider(
+          create: (context) => NotificationProvider(services.notificationService),
         ),
-        BlocProvider<ThemeBloc>(
-          create: (context) => ThemeBloc(),
+        ChangeNotifierProvider(
+          create: (context) => ThemeProvider(),
         ),
       ],
-      child: BlocBuilder<ThemeBloc, ThemeState>(
-        builder: (context, themeState) {
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
           return MaterialApp(
-            navigatorKey: DeepLinkService().navigationKey,
+            navigatorKey: services.deepLinkService.navigationKey,
             title: 'Cat Game',
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -59,15 +101,15 @@ class CatGameApp extends StatelessWidget {
               Locale('en'),
               Locale('de'),
             ],
-            theme: themeState.themeData,
+            theme: themeProvider.themeData,
             initialRoute: '/',
             routes: {
               '/': (context) => const LoginPage(),
               '/game': (context) {
-                final gameId =
-                    ModalRoute.of(context)?.settings.arguments as String?;
+                final gameId = ModalRoute.of(context)?.settings.arguments as String;
                 return GamePage(gameId: gameId);
               },
+              '/verify-email': (context) => const VerificationRequiredPage(),
             },
           );
         },
