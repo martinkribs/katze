@@ -188,7 +188,7 @@ class _GameView extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          if (gameState.gameData!['isGameMaster'] == true &&
+                          if (gameState.gameData!['isGameMaster'] == 1 &&
                               gameState.gameData!['gameStatus'] ==
                                   'pending') ...[
                             ElevatedButton.icon(

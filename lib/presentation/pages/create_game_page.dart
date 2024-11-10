@@ -2,6 +2,7 @@ import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/game_service.dart';
+import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -185,14 +186,19 @@ class _CreateGamePageState extends State<CreateGamePage> {
   void _createGame() async {
     if (_formKey.currentState!.validate()) {
       try {
-        await context.read<GameService>().createGame(
+        final gameResponse = await context.read<GameService>().createGame(
               name: _gameNameController.text,
               description: _descriptionController.text,
               isPrivate: _isPrivate,
               timezone: _selectedTimezone!,
             );
 
-        // Navigate to a different page or show success message
+        // Extract game ID from the response
+        final gameId = gameResponse['gameId'];
+
+        // Navigate to the game page
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => GamePage(gameId: gameId)));
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create game: $e')),
