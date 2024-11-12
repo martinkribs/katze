@@ -13,7 +13,7 @@ class RegistrationState extends ChangeNotifier {
 
   RegistrationState(this._authService);
 
-  Future<bool> register({
+  Future<Map<String, dynamic>?> register({
     required String name,
     required String email,
     required String password,
@@ -23,15 +23,15 @@ class RegistrationState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authService.register(
+      final result = await _authService.register(
         name: name,
         email: email,
         password: password,
       );
-      return true;
+      return result;
     } catch (e) {
       errorMessage = e.toString().replaceAll('Exception: ', '');
-      return false;
+      return null;
     } finally {
       isLoading = false;
       notifyListeners();
@@ -69,18 +69,23 @@ class _RegistrationViewState extends State<_RegistrationView> {
     if (!_formKey.currentState!.validate()) return;
 
     final state = context.read<RegistrationState>();
-    final success = await state.register(
+    final result = await state.register(
       name: _usernameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
-    if (success && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const VerificationRequiredPage(),
-        ),
-      );
+    if (result != null && mounted) {
+      // Wait a moment to ensure token is saved
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const VerificationRequiredPage(),
+          ),
+        );
+      }
     }
   }
 

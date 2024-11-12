@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/game_service.dart';
+import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -54,46 +55,56 @@ class GameState extends ChangeNotifier {
     }
   }
 
-  void shareInvite(BuildContext context) {
+  Future<void> shareInvite(BuildContext context) async {
     if (_gameData == null) return;
 
-    final inviteLink = _gameService.generateInviteLink(gameId);
-    final whatsAppText = _gameService.generateWhatsAppShareText(
-      gameId,
-      _gameData!['name'] ?? 'Unnamed Game',
-    );
+    try {
+      final inviteLink = await _gameService.createInviteLink(gameId);
+      final whatsAppText = await _gameService.generateWhatsAppShareText(
+        gameId,
+        _gameData!['name'] ?? 'Unnamed Game',
+      );
 
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.copy),
-                title: const Text('Copy Invite Link'),
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: inviteLink));
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invite link copied!')),
-                  );
-                },
+      if (context.mounted) {
+        showModalBottomSheet(
+          context: context,
+          builder: (BuildContext context) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.copy),
+                    title: const Text('Copy Invite Link'),
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: inviteLink));
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invite link copied!')),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.share),
+                    title: const Text('Share via WhatsApp'),
+                    onTap: () {
+                      Share.share(whatsAppText);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('Share via WhatsApp'),
-                onTap: () {
-                  Share.share(whatsAppText);
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
+            );
+          },
         );
-      },
-    );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate invite link: $e')),
+        );
+      }
+    }
   }
 }
 
@@ -134,7 +145,13 @@ class _GameView extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: () {
-                // TODO: Navigate to game settings
+                Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => GameSettingsPage(
+                    gameId: gameState.gameId,
+                  ),
+                ),
+              );
               },
             ),
         ],

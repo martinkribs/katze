@@ -35,20 +35,19 @@ class DeepLinkService {
 
   void _handleDeepLink(Uri uri) {
     if (uri.host == 'game-invite') {
-      final gameId = uri.queryParameters['gameId'];
-      if (gameId != null) {
-        _navigationKey.currentState?.pushNamed('/game', arguments: gameId);
+      final token = uri.queryParameters['token'];
+      if (token != null) {
+        _navigationKey.currentState?.pushNamed('/join-game', arguments: token);
         _deepLinkStreamController.add(uri.toString());
       }
     }
   }
 
-  static String generateGameInviteLink(String gameId) {
-    if (gameId.isEmpty) {
-      throw ArgumentError('Game ID cannot be empty');
+  static String generateGameInviteLink(String token) {
+    if (token.isEmpty) {
+      throw ArgumentError('Token cannot be empty');
     }
-    final encodedGameId = Uri.encodeComponent(gameId);
-    return 'katze://game-invite?gameId=$encodedGameId';
+    return 'katze://game-invite?token=$token';
   }
 
   void dispose() {

@@ -6,10 +6,12 @@ import 'package:katze/core/services/game_service.dart';
 import 'package:katze/core/services/notification_service.dart';
 import 'package:katze/data/repositories/game_repository.dart';
 import 'package:katze/presentation/pages/game_page.dart';
+import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
 import 'package:katze/presentation/providers/game_provider.dart';
 import 'package:katze/presentation/providers/notification_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:katze/presentation/widgets/join_game_modal.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -120,6 +122,32 @@ class MyApp extends StatelessWidget {
                 return GamePage(gameId: gameId);
               },
               '/verify-email': (context) => const VerificationRequiredPage(),
+              '/game-settings': (context) {
+                final gameId =
+                    ModalRoute.of(context)?.settings.arguments as int;
+                return GameSettingsPage(gameId: gameId);
+              },
+              '/join-game': (context) {
+                final token =
+                    ModalRoute.of(context)?.settings.arguments as String;
+                
+                // Show join game modal
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => JoinGameModal(
+                      token: token,
+                      gameService: services.gameService,
+                    ),
+                  );
+                });
+
+                // Return empty scaffold while modal is shown
+                return const Scaffold(
+                  body: SizedBox(),
+                );
+              },
             },
           );
         },
