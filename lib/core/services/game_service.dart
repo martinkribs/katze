@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/core/services/deep_link_service.dart';
 
 class GameService {
   static const String _baseUrl = 'http://10.0.2.2:8000/api';
@@ -87,7 +88,7 @@ class GameService {
   }
 
   Future<Map<String, dynamic>> updateGameSettings({
-    required String gameId,
+    required int gameId,
     required Map<String, dynamic> settings,
   }) async {
     final token = await _authService.getToken();
@@ -133,12 +134,53 @@ class GameService {
     }
   }
 
-  String generateInviteLink(int gameId) {
-    return 'katze://game-invite?id=$gameId';
+  Future<String> createInviteLink(int gameId) async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('No authentication token found');
+    }
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/games/$gameId/invite-link'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return DeepLinkService.generateGameInviteLink(data['token']);
+    } else {
+      throw Exception('Failed to create invite link: ${response.body}');
+    }
   }
 
-  String generateWhatsAppShareText(int gameId, String gameName) {
-    final inviteLink = generateInviteLink(gameId);
+  Future<Map<String, dynamic>> joinGame(String token) async {
+    final authToken = await _authService.getToken();
+    if (authToken == null) {
+      throw Exception('No authentication token found');
+    }
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/join-game/$token'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+    );
+
+    final data = jsonDecode(response.body);
+    
+    if (response.statusCode == 200) {
+      return data;
+    } else {
+      throw Exception(data['message'] ?? 'Failed to join game');
+    }
+  }
+
+  Future<String> generateWhatsAppShareText(int gameId, String gameName) async {
+    final inviteLink = await createInviteLink(gameId);
     return 'Join my Cat Game "$gameName"! Click here to join: $inviteLink';
   }
 }
