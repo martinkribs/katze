@@ -23,6 +23,31 @@ class AuthService {
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
 
+  // Verify email with code
+  Future<bool> verifyEmail(String code) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('No authentication token found');
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/email/verify'),
+        headers: _getAuthHeaders(token),
+        body: jsonEncode({'code': code}),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Email verification failed');
+      }
+    } catch (e) {
+      throw Exception('Email verification failed: ${e.toString()}');
+    }
+  }
+
   // Get current user data with token refresh handling
   Future<Map<String, dynamic>> getCurrentUser() async {
     final token = await getToken();
@@ -143,7 +168,7 @@ class AuthService {
     }
 
     final response = await http.post(
-      Uri.parse('$_baseUrl/email/verification-notification'),
+      Uri.parse('$_baseUrl/email/verify/resend'),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -162,10 +187,10 @@ class AuthService {
   // Save user data securely
   Future<void> _saveUserData(Map<String, dynamic> userData) async {
     // Save token securely
-    if (userData['token'] != null) {
+    if (userData['access_token'] != null) {
       await _storage.write(
         key: _tokenKey,
-        value: userData['token'],
+        value: userData['access_token'],
         aOptions: _secureOptions,
       );
     }
@@ -219,7 +244,7 @@ class AuthService {
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
         await _saveUserData(responseBody);
-        return responseBody['token'];
+        return responseBody['access_token'];
       }
     } catch (e) {
       print('Token refresh failed: ${e.toString()}');
