@@ -145,17 +145,32 @@ class AuthService {
         }),
       );
 
+      String responseBody = response.body.trim();
       if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
-        await _saveUserData(responseBody);
-        await _resetLoginAttempts();
-        return responseBody;
+        try {
+          final Map<String, dynamic> jsonResponse = jsonDecode(responseBody);
+          await _saveUserData(jsonResponse);
+          await _resetLoginAttempts();
+          return jsonResponse;
+        } catch (e) {
+          print('JSON Parse Error: $e');
+          print('Response Body: $responseBody');
+          throw AuthException('Invalid response format from server');
+        }
       } else {
         await _incrementLoginAttempts();
-        final error = jsonDecode(response.body);
-        throw AuthException(error['message'] ?? 'Login failed');
+        try {
+          final error = jsonDecode(responseBody);
+          throw AuthException(error['message'] ?? 'Login failed');
+        } catch (e) {
+          print('Error Response Body: $responseBody');
+          throw AuthException('Login failed: Invalid server response');
+        }
       }
     } catch (e) {
+      if (e is AuthException) {
+        rethrow;
+      }
       throw AuthException('Login failed: ${e.toString()}');
     }
   }
@@ -234,7 +249,7 @@ class AuthService {
 
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/refresh'),
+        Uri.parse('$_baseUrl/token/refresh'),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $refreshToken',

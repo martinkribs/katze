@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:katze/core/services/game_service.dart';
+import 'package:provider/provider.dart';
+import 'package:katze/presentation/providers/game_provider.dart';
 
 class JoinGameModal extends StatefulWidget {
   final String token;
-  final GameService gameService;
 
   const JoinGameModal({
     super.key,
     required this.token,
-    required this.gameService,
   });
 
   @override
@@ -28,10 +27,12 @@ class _JoinGameModalState extends State<JoinGameModal> {
 
   Future<void> _joinGame() async {
     try {
-      final result = await widget.gameService.joinGame(widget.token);
+      final gameProvider = Provider.of<GameProvider>(context, listen: false);
+      await gameProvider.joinGame(widget.token);
+      
       if (mounted) {
         setState(() {
-          _gameData = result;
+          _gameData = gameProvider.currentGame;
           _isLoading = false;
         });
         
@@ -40,7 +41,7 @@ class _JoinGameModalState extends State<JoinGameModal> {
           if (mounted) {
             Navigator.of(context).pushReplacementNamed(
               '/game',
-              arguments: result['game']['id'],
+              arguments: _gameData?['id'],
             );
           }
         });
@@ -92,7 +93,7 @@ class _JoinGameModalState extends State<JoinGameModal> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Successfully joined ${_gameData?['game']['name'] ?? 'game'}!',
+                'Successfully joined ${_gameData?['name'] ?? 'game'}!',
                 style: Theme.of(context).textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),

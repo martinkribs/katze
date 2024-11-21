@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/deep_link_service.dart';
-import 'package:katze/core/services/game_service.dart';
 import 'package:katze/core/services/notification_service.dart';
-import 'package:katze/data/repositories/game_repository.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
@@ -22,8 +20,6 @@ void main() async {
 
   // Services initialisieren
   final authService = AuthService();
-  final gameService = GameService(authService);
-  final gameRepository = GameRepository(authService);
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
   tz.initializeTimeZones();
@@ -39,8 +35,6 @@ void main() async {
       deepLinkService: deepLinkService,
       notificationService: notificationService,
       authService: authService,
-      gameService: gameService,
-      gameRepository: gameRepository,
     ),
   ));
 }
@@ -50,15 +44,11 @@ class AppServices {
   final DeepLinkService deepLinkService;
   final NotificationService notificationService;
   final AuthService authService;
-  final GameService gameService;
-  final GameRepository gameRepository;
 
   const AppServices({
     required this.deepLinkService,
     required this.notificationService,
     required this.authService,
-    required this.gameService,
-    required this.gameRepository,
   });
 }
 
@@ -76,18 +66,15 @@ class MyApp extends StatelessWidget {
       providers: [
         // Services
         Provider<AuthService>.value(value: services.authService),
-        Provider<GameService>.value(value: services.gameService),
         Provider<DeepLinkService>.value(value: services.deepLinkService),
         Provider<NotificationService>.value(
             value: services.notificationService),
-        Provider<GameRepository>.value(value: services.gameRepository),
-
         // State Provider
         ChangeNotifierProvider(
-          create: (context) => GameProvider(services.gameRepository),
+          create: (context) => GameProvider(services.authService),
         ),
         ChangeNotifierProvider(
-          create: (context) => AuthStateManager(AuthService()),
+          create: (context) => AuthStateManager(services.authService),
         ),
         ChangeNotifierProvider(
           create: (context) =>
@@ -138,7 +125,6 @@ class MyApp extends StatelessWidget {
                     barrierDismissible: false,
                     builder: (context) => JoinGameModal(
                       token: token,
-                      gameService: services.gameService,
                     ),
                   );
                 });

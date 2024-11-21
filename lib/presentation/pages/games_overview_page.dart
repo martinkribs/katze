@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:katze/core/services/game_service.dart';
 import 'package:katze/presentation/pages/create_game_page.dart';
 import 'package:katze/presentation/pages/game_page.dart';
+import 'package:katze/presentation/providers/game_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -25,37 +25,50 @@ enum GameStatus {
   }
 }
 
-class GamesOverviewState extends ChangeNotifier {
-  final GameService _gameService;
-  bool _isLoading = false;
-  String? _errorMessage;
-  List<Map<String, dynamic>> _allGames = [];
-  Set<GameStatus> _selectedFilters = {GameStatus.all};
-  int _currentPage = 1;
-  int _lastPage = 1;
-  int _perPage = 10;
-  int _totalGames = 0;
+class GamesOverviewPage extends StatefulWidget {
+  const GamesOverviewPage({super.key});
 
-  GamesOverviewState(this._gameService) {
-    loadGames();
+  @override
+  State<GamesOverviewPage> createState() => _GamesOverviewPageState();
+}
+
+class _GamesOverviewPageState extends State<GamesOverviewPage> {
+  Set<GameStatus> _selectedFilters = {GameStatus.all};
+
+  @override
+  void initState() {
+    super.initState();
+    // Load games when the page is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<GameProvider>().loadGames();
+    });
   }
 
-  // Getters
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-  Set<GameStatus> get selectedFilters => _selectedFilters;
-  int get currentPage => _currentPage;
-  int get lastPage => _lastPage;
-  int get perPage => _perPage;
-  int get totalGames => _totalGames;
+  void _toggleFilter(GameStatus status) {
+    setState(() {
+      if (status == GameStatus.all) {
+        _selectedFilters = {GameStatus.all};
+      } else {
+        _selectedFilters.remove(GameStatus.all);
+        if (_selectedFilters.contains(status)) {
+          _selectedFilters.remove(status);
+          if (_selectedFilters.isEmpty) {
+            _selectedFilters = {GameStatus.all};
+          }
+        } else {
+          _selectedFilters.add(status);
+        }
+      }
+    });
+  }
 
-  // Filtered games getter
-  List<Map<String, dynamic>> get games {
+  List<Map<String, dynamic>> _getFilteredGames(
+      List<Map<String, dynamic>> games) {
     if (_selectedFilters.contains(GameStatus.all)) {
-      return _allGames;
+      return games;
     }
 
-    return _allGames.where((game) {
+    return games.where((game) {
       final status = game['status']?.toLowerCase();
       return _selectedFilters.any((filter) {
         switch (filter) {
@@ -72,45 +85,7 @@ class GamesOverviewState extends ChangeNotifier {
     }).toList();
   }
 
-  void toggleFilter(GameStatus status) {
-    if (status == GameStatus.all) {
-      _selectedFilters = {GameStatus.all};
-    } else {
-      _selectedFilters.remove(GameStatus.all);
-      if (_selectedFilters.contains(status)) {
-        _selectedFilters.remove(status);
-        if (_selectedFilters.isEmpty) {
-          _selectedFilters = {GameStatus.all};
-        }
-      } else {
-        _selectedFilters.add(status);
-      }
-    }
-    notifyListeners();
-  }
-
-  Future<void> loadGames({int page = 1}) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response =
-          await _gameService.getGames(page: page, perPage: _perPage);
-      _allGames = List<Map<String, dynamic>>.from(response['games']);
-      _currentPage = response['meta']['current_page'];
-      _lastPage = response['meta']['last_page'];
-      _perPage = response['meta']['per_page'];
-      _totalGames = response['meta']['total'];
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Widget buildGameStatusChip(String? status, {bool small = false}) {
+  Widget _buildGameStatusChip(String? status, {bool small = false}) {
     Color chipColor;
     String label;
 
@@ -144,204 +119,168 @@ class GamesOverviewState extends ChangeNotifier {
       padding: small ? const EdgeInsets.all(4) : null,
     );
   }
-}
-
-class GamesOverviewPage extends StatelessWidget {
-  const GamesOverviewPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => GamesOverviewState(context.read<GameService>()),
-      child: const _GamesOverviewView(),
-    );
-  }
-}
+    return Consumer<GameProvider>(
+      builder: (context, gameProvider, _) {
+        final filteredGames = _getFilteredGames(gameProvider.games);
 
-class _GamesOverviewView extends StatelessWidget {
-  const _GamesOverviewView();
-
-  @override
-  Widget build(BuildContext context) {
-    final gamesState = context.watch<GamesOverviewState>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Games'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.brightness_6),
-            onPressed: () {
-              context.read<ThemeProvider>().toggleTheme();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => gamesState.loadGames(),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: _FilterChips(),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => gamesState.loadGames(),
-        child: gamesState.isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : gamesState.errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          gamesState.errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('My Games'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.brightness_6),
+                onPressed: () {
+                  context.read<ThemeProvider>().toggleTheme();
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => gameProvider.loadGames(),
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(60),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: GameStatus.values.map((status) {
+                    final isSelected = _selectedFilters.contains(status);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(status.displayName),
+                        selected: isSelected,
+                        onSelected: (_) => _toggleFilter(status),
+                        backgroundColor:
+                            Theme.of(context).scaffoldBackgroundColor,
+                        selectedColor:
+                            Theme.of(context).primaryColor.withOpacity(0.8),
+                        checkmarkColor:
+                            Theme.of(context).textTheme.bodyLarge?.color,
+                        labelStyle: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => gamesState.loadGames(),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
-                : gamesState.games.isEmpty
-                    ? const _EmptyGamesView()
-                    : _GamesList(games: gamesState.games),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const CreateGamePage(),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class _FilterChips extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final gamesState = context.watch<GamesOverviewState>();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: GameStatus.values.map((status) {
-          final isSelected = gamesState.selectedFilters.contains(status);
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(status.displayName),
-              selected: isSelected,
-              onSelected: (_) => gamesState.toggleFilter(status),
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              selectedColor: Theme.of(context).primaryColor.withOpacity(0.8),
-              checkmarkColor: Theme.of(context).textTheme.bodyLarge?.color,
-              labelStyle: TextStyle(
-                color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _EmptyGamesView extends StatelessWidget {
-  const _EmptyGamesView();
-
-  @override
-  Widget build(BuildContext context) {
-    final gamesState = context.watch<GamesOverviewState>();
-    bool hasFilters = !gamesState.selectedFilters.contains(GameStatus.all);
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            hasFilters ? 'No games match the selected filters' : 'No games yet',
-            style: const TextStyle(fontSize: 18),
           ),
-          const SizedBox(height: 16),
-          if (hasFilters)
-            ElevatedButton(
-              onPressed: () => gamesState.toggleFilter(GameStatus.all),
-              child: const Text('Show all games'),
-            )
-          else
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const CreateGamePage(),
-                  ),
-                );
-              },
-              child: const Text('Create Game'),
-            ),
-        ],
-      ),
-    );
-  }
-}
+          body: RefreshIndicator(
+            onRefresh: () => gameProvider.loadGames(),
+            child: gameProvider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : gameProvider.error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              gameProvider.error!,
+                              style: const TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => gameProvider.loadGames(),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : filteredGames.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  !_selectedFilters.contains(GameStatus.all)
+                                      ? 'No games match the selected filters'
+                                      : 'No games yet',
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                                const SizedBox(height: 16),
+                                if (!_selectedFilters.contains(GameStatus.all))
+                                  ElevatedButton(
+                                    onPressed: () =>
+                                        _toggleFilter(GameStatus.all),
+                                    child: const Text('Show all games'),
+                                  )
+                                else
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const CreateGamePage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Create Game'),
+                                  ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredGames.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == filteredGames.length) {
+                                return gameProvider.currentPage <
+                                        gameProvider.lastPage
+                                    ? Center(
+                                        child: ElevatedButton(
+                                          onPressed: () =>
+                                              gameProvider.loadGames(
+                                            page: gameProvider.currentPage + 1,
+                                          ),
+                                          child: const Text('Load More'),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink();
+                              }
 
-class _GamesList extends StatelessWidget {
-  final List<Map<String, dynamic>> games;
-
-  const _GamesList({required this.games});
-
-  @override
-  Widget build(BuildContext context) {
-    final gamesState = context.watch<GamesOverviewState>();
-
-    return ListView.builder(
-      itemCount: games.length + 1,
-      itemBuilder: (context, index) {
-        if (index == games.length) {
-          return gamesState.currentPage < gamesState.lastPage
-              ? Center(
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        gamesState.loadGames(page: gamesState.currentPage + 1),
-                    child: const Text('Load More'),
-                  ),
-                )
-              : const SizedBox.shrink();
-        }
-
-        final game = games[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+                              final game = filteredGames[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                child: ListTile(
+                                  title: Text(game['name'] ?? 'Unnamed Game'),
+                                  subtitle: Text(
+                                    'Players: ${game['playerCount'] ?? 0}',
+                                  ),
+                                  trailing:
+                                      _buildGameStatusChip(game['status']),
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => GamePage(
+                                          gameId: game['id'],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
           ),
-          child: ListTile(
-            title: Text(game['name'] ?? 'Unnamed Game'),
-            subtitle: Text(
-              'Players: ${game['playerCount'] ?? 0}',
-            ),
-            trailing: context
-                .read<GamesOverviewState>()
-                .buildGameStatusChip(game['status']),
-            onTap: () {
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => GamePage(
-                    gameId: game['id'],
-                  ),
+                  builder: (context) => const CreateGamePage(),
                 ),
               );
             },
+            child: const Icon(Icons.add),
           ),
         );
       },

@@ -1,27 +1,86 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:katze/data/repositories/game_repository.dart';
+import 'package:http/http.dart' as http;
+import 'package:katze/core/services/auth_service.dart';
 
 class GameProvider with ChangeNotifier {
-  final GameRepository _repository;
+  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  final AuthService _authService;
+
   List<Map<String, dynamic>> _games = [];
   Map<String, dynamic>? _currentGame;
   bool _isLoading = false;
   String? _error;
 
-  GameProvider(this._repository);
+  // Pagination state
+  int _currentPage = 1;
+  int _lastPage = 1;
+  int _perPage = 10;
+  int _totalGames = 0;
 
+  GameProvider(this._authService);
+
+  // Getters
   List<Map<String, dynamic>> get games => _games;
+
   Map<String, dynamic>? get currentGame => _currentGame;
+
   bool get isLoading => _isLoading;
+
   String? get error => _error;
 
-  Future<void> loadGames() async {
+  int get currentPage => _currentPage;
+
+  int get lastPage => _lastPage;
+
+  int get perPage => _perPage;
+
+  int get totalGames => _totalGames;
+
+  // Helper method for API calls
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('No authentication token found');
+    }
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  // Load games list with pagination support
+  Future<void> loadGames({int page = 1, int perPage = 10}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _games = await _repository.getGames();
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/games?page=$page&per_page=$perPage'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Update pagination info from meta
+        final meta = data['meta'];
+        _currentPage = meta['current_page'];
+        _lastPage = meta['last_page'];
+        _perPage = meta['per_page'];
+        _totalGames = meta['total'];
+
+        // Cast the games list properly
+        final List<dynamic> gamesList = data['games'] ?? [];
+        _games = List<Map<String, dynamic>>.from(
+            gamesList.map((game) => Map<String, dynamic>.from(game)));
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to load games');
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -30,13 +89,25 @@ class GameProvider with ChangeNotifier {
     }
   }
 
+  // Load single game details
   Future<void> loadGameDetails(String gameId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _currentGame = await _repository.getGameDetails(gameId);
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/games/$gameId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        _currentGame = Map<String, dynamic>.from(jsonDecode(response.body));
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to load game details');
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -45,28 +116,48 @@ class GameProvider with ChangeNotifier {
     }
   }
 
-  Future<void> createGame({
+  // Create new game
+  Future<int> createGame({
     required String name,
-    required Map<String, dynamic> settings,
+    required String description,
+    required bool isPrivate,
+    required String timezone,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final newGame = await _repository.createGame(
-        name: name,
-        settings: settings,
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games'),
+        headers: headers,
+        body: jsonEncode({
+          'name': name,
+          'description': description,
+          'is_private': isPrivate,
+          'timezone': timezone,
+        }),
       );
-      _games = [..._games, newGame];
+
+      if (response.statusCode == 201) {
+        final data = Map<String, dynamic>.from(jsonDecode(response.body));
+        return data['gameId'] as int;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to create game');
+      }
     } catch (e) {
       _error = e.toString();
+      notifyListeners();
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  // Update game settings
   Future<void> updateGameSettings({
     required String gameId,
     required Map<String, dynamic> settings,
@@ -76,21 +167,19 @@ class GameProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final updatedGame = await _repository.updateGameSettings(
-        gameId: gameId,
-        settings: settings,
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse('$_baseUrl/games/$gameId/settings'),
+        headers: headers,
+        body: jsonEncode(settings),
       );
-      
-      if (_currentGame != null && _currentGame!['id'] == gameId) {
-        _currentGame = updatedGame;
+
+      if (response.statusCode == 200) {
+        await loadGameDetails(gameId);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to update game settings');
       }
-      
-      _games = _games.map((game) {
-        if (game['id'] == gameId) {
-          return updatedGame;
-        }
-        return game;
-      }).toList();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -99,24 +188,25 @@ class GameProvider with ChangeNotifier {
     }
   }
 
+  // Start game
   Future<void> startGame(String gameId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final startedGame = await _repository.startGame(gameId);
-      
-      if (_currentGame != null && _currentGame!['id'] == gameId) {
-        _currentGame = startedGame;
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games/$gameId/start'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        await loadGameDetails(gameId);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to start game');
       }
-      
-      _games = _games.map((game) {
-        if (game['id'] == gameId) {
-          return startedGame;
-        }
-        return game;
-      }).toList();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -125,11 +215,80 @@ class GameProvider with ChangeNotifier {
     }
   }
 
-  String generateInviteLink(String gameId) {
-    return _repository.generateInviteLink(gameId);
+  // Create and get invite link
+  Future<Map<String, dynamic>> createInviteLink(String gameId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games/$gameId/invite-link'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = Map<String, dynamic>.from(jsonDecode(response.body));
+        return {
+          'token': data['token'],
+          'inviteLink': data['invite_link'],
+          'expiresAt': data['expires_at'],
+        };
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to create invite link');
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  String generateWhatsAppShareText(String gameId, String gameName) {
-    return _repository.generateWhatsAppShareText(gameId, gameName);
+  // Join game with invite token
+  Future<Map<String, dynamic>> joinGame(String token) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/join-game/$token'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = Map<String, dynamic>.from(jsonDecode(response.body));
+        final game = Map<String, dynamic>.from(data['game']);
+        await loadGameDetails(game['id'].toString());
+        return game;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to join game');
+      }
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Generate WhatsApp share text
+  Future<String> generateWhatsAppShareText(
+      String gameId, String gameName) async {
+    final inviteData = await createInviteLink(gameId);
+    return 'Join my Cat Game "$gameName"! Click here to join: ${inviteData['inviteLink']}';
+  }
+
+  // Clear current game
+  void clearCurrentGame() {
+    _currentGame = null;
+    notifyListeners();
+  }
+
+  // Clear error
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

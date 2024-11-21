@@ -1,35 +1,8 @@
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
-import 'package:katze/core/services/auth_service.dart';
-import 'package:katze/core/services/game_service.dart';
-import 'package:katze/presentation/pages/game_page.dart';
+import 'package:katze/presentation/providers/game_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
-
-class CreateGameState extends ChangeNotifier {
-  final AuthService _authService;
-  final GameService _gameService;
-
-  CreateGameState(this._authService, this._gameService);
-
-  Future<void> createGame({
-    required String name,
-    required String description,
-    required bool isPrivate,
-    required String timezone,
-  }) async {
-    try {
-      await _gameService.createGame(
-        name: name,
-        description: description,
-        isPrivate: isPrivate,
-        timezone: timezone,
-      );
-    } catch (e) {
-      rethrow;
-    }
-  }
-}
 
 class CreateGamePage extends StatefulWidget {
   const CreateGamePage({super.key});
@@ -65,6 +38,8 @@ class _CreateGamePageState extends State<CreateGamePage> {
 
   @override
   Widget build(BuildContext context) {
+    final gameProvider = Provider.of<GameProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create New Game'),
@@ -84,6 +59,14 @@ class _CreateGamePageState extends State<CreateGamePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (gameProvider.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Text(
+                    gameProvider.error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: _gameNameController,
@@ -173,8 +156,10 @@ class _CreateGamePageState extends State<CreateGamePage> {
               ),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: _createGame,
-                child: const Text('Create Game'),
+                onPressed: gameProvider.isLoading ? null : _createGame,
+                child: gameProvider.isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('Create Game'),
               ),
             ],
           ),
@@ -186,19 +171,22 @@ class _CreateGamePageState extends State<CreateGamePage> {
   void _createGame() async {
     if (_formKey.currentState!.validate()) {
       try {
-        final gameResponse = await context.read<GameService>().createGame(
-              name: _gameNameController.text,
-              description: _descriptionController.text,
-              isPrivate: _isPrivate,
-              timezone: _selectedTimezone!,
-            );
+        final gameProvider = context.read<GameProvider>();
+        await gameProvider.createGame(
+          name: _gameNameController.text,
+          description: _descriptionController.text,
+          isPrivate: _isPrivate,
+          timezone: _selectedTimezone!,
+        );
 
-        // Extract game ID from the response
-        final gameId = gameResponse['gameId'];
-
-        // Navigate to the game page
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (context) => GamePage(gameId: gameId)));
+        if (mounted && gameProvider.currentGame != null) {
+          // Navigate to the game page
+          Navigator.pushReplacementNamed(
+            context,
+            '/game',
+            arguments: gameProvider.currentGame!['gameId'],
+          );
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create game: $e')),
