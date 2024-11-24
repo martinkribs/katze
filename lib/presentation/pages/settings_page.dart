@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
         await authService.deleteAccount();
         if (mounted) {
           // Navigate to login page and clear navigation stack
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       } catch (e) {
         if (mounted) {
@@ -84,7 +84,7 @@ class _SettingsPageState extends State<SettingsPage> {
         await authService.logout();
         if (mounted) {
           // Navigate to login page and clear navigation stack
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       } catch (e) {
         if (mounted) {

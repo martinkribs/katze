@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/widgets/game_details_card.dart';
+import 'package:katze/presentation/widgets/player_list.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -20,16 +22,33 @@ class GamePage extends StatefulWidget {
 }
 
 class _GamePageState extends State<GamePage> {
+  Future<void> _loadGameData() async {
+    final gameProvider = context.read<GameProvider>();
+    await gameProvider.loadGameDetails(widget.gameId.toString());
+    
+    // After game details are loaded, check if we need to load role action types
+    final currentGame = gameProvider.currentGame;
+    if (currentGame != null && 
+        currentGame['currentUser']?['role'] != null && 
+        !currentGame['currentUser']['isGameMaster']) {
+      print('Loading role action types for role: ${currentGame['currentUser']['role']}'); // Debug print
+      await gameProvider.loadRoleActionTypes(
+        currentGame['currentUser']['role']['id'].toString(),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    // Load game details when the page is initialized
+    // Load game data when the page is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<GameProvider>().loadGameDetails(widget.gameId.toString());
+      _loadGameData();
     });
   }
 
-  Future<void> _confirmLeaveGame(BuildContext context, GameProvider gameProvider) async {
+  Future<void> _confirmLeaveGame(
+      BuildContext context, GameProvider gameProvider) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -57,7 +76,6 @@ class _GamePageState extends State<GamePage> {
       try {
         await gameProvider.leaveGame(widget.gameId.toString());
         if (mounted) {
-          // Refresh games list and navigate back
           await gameProvider.loadGames();
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -74,13 +92,15 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
-  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
+  Future<void> _confirmDelete(
+      BuildContext context, GameProvider gameProvider) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Delete Game'),
-          content: const Text('Are you sure you want to delete this game? This action cannot be undone.'),
+          content: const Text(
+              'Are you sure you want to delete this game? This action cannot be undone.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -102,9 +122,8 @@ class _GamePageState extends State<GamePage> {
       try {
         await gameProvider.deleteGame(widget.gameId.toString());
         if (mounted) {
-          // Refresh games list before navigating back
           await gameProvider.loadGames();
-          Navigator.of(context).pop(); // Return to games list
+          Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Game deleted successfully')),
           );
@@ -178,87 +197,6 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
-  Widget _buildGameDetails(Map<String, dynamic> gameData, ThemeData theme) {
-    final gameDetails = gameData['gameDetails'];
-    final currentUserRole = gameData['currentUserRole'];
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Game Status: ${gameData['status']}',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Players: ${gameData['playerCount']} / ${gameData['minPlayers']}',
-              style: theme.textTheme.titleMedium,
-            ),
-            if (gameDetails['startedAt'] != null) ...[
-              const SizedBox(height: 8),
-              Text('Started: ${gameDetails['startedAt']}'),
-            ],
-            if (gameDetails['completedAt'] != null) ...[
-              const SizedBox(height: 8),
-              Text('Completed: ${gameDetails['completedAt']}'),
-              if (gameDetails['winningTeam'] != null)
-                Text('Winning Team: ${gameDetails['winningTeam']}'),
-            ],
-            const SizedBox(height: 8),
-            Text('Time Zone: ${gameDetails['timezone']}'),
-            if (currentUserRole['isGameMaster'])
-              Text('Role: Game Master',
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(color: theme.primaryColor)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayersList(List<dynamic> players, ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Players',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: players.length,
-              itemBuilder: (context, index) {
-                final player = players[index];
-                return ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(player['name'] ?? ''),
-                  subtitle: player['role'] != null
-                      ? Text('Role: ${player['role']['name']}')
-                      : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (player['isGameMaster'])
-                        const Chip(label: Text('Game Master')),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<GameProvider>(
@@ -271,7 +209,7 @@ class _GamePageState extends State<GamePage> {
             title: Text(gameData?['name'] ?? 'Game Details'),
             actions: [
               if (gameData != null) ...[
-                if (gameData['currentUserRole']['isGameMaster']) ...[
+                if (gameData['currentUser']['isGameMaster']) ...[
                   IconButton(
                     icon: const Icon(Icons.settings),
                     onPressed: () {
@@ -288,7 +226,7 @@ class _GamePageState extends State<GamePage> {
                     icon: const Icon(Icons.delete),
                     onPressed: () => _confirmDelete(context, gameProvider),
                   ),
-                ] else ...[
+                ] else if (gameData['status'] == 'pending') ...[
                   IconButton(
                     icon: const Icon(Icons.exit_to_app),
                     onPressed: () => _confirmLeaveGame(context, gameProvider),
@@ -311,8 +249,7 @@ class _GamePageState extends State<GamePage> {
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: () => gameProvider
-                                .loadGameDetails(widget.gameId.toString()),
+                            onPressed: () => _loadGameData(),
                             child: const Text('Retry'),
                           ),
                         ],
@@ -325,9 +262,9 @@ class _GamePageState extends State<GamePage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _buildGameDetails(gameData, theme),
+                              GameDetailsCard(gameData: gameData),
                               const SizedBox(height: 16),
-                              if (gameData['currentUserRole']['isGameMaster'] &&
+                              if (gameData['currentUser']['isGameMaster'] &&
                                   gameData['status'] == 'pending') ...[
                                 ElevatedButton.icon(
                                   onPressed: () =>
@@ -336,27 +273,27 @@ class _GamePageState extends State<GamePage> {
                                   label: const Text('Invite Players'),
                                 ),
                                 const SizedBox(height: 8),
-                                if (gameData['playerCount'] >=
-                                    gameData['minPlayers'])
-                                  ElevatedButton.icon(
-                                    onPressed: () => gameProvider
-                                        .startGame(widget.gameId.toString()),
-                                    icon: const Icon(Icons.play_arrow),
-                                    label: const Text('Start Game'),
-                                  )
-                                else
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      'Need at least ${gameData['minPlayers']} players to start',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(color: Colors.red),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await gameProvider.startGame(widget.gameId.toString());
+                                    // Reload game data after starting
+                                    if (mounted) {
+                                      _loadGameData();
+                                    }
+                                  },
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: const Text('Start Game'),
+                                ),
                               ],
                               const SizedBox(height: 16),
-                              _buildPlayersList(gameData['players'], theme),
+                              PlayerList(
+                                players: gameData['players'],
+                                currentUser: gameData['currentUser'],
+                                gameId: widget.gameId.toString(),
+                                gameStatus: gameData['status'],
+                                isVotingPhase: gameData['gameDetails']['isVotingPhase'] ?? false,
+                                gameDetails: gameData['gameDetails'],
+                              ),
                             ],
                           ),
                         ),

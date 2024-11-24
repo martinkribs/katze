@@ -14,6 +14,7 @@ class GameProvider with ChangeNotifier {
   Map<String, dynamic>? _currentGame;
   List<Map<String, dynamic>> _roles = [];
   Map<String, dynamic>? _currentGameSettings;
+  Map<String, dynamic>? _roleActionTypes;
   bool _isLoading = false;
   String? _error;
 
@@ -36,7 +37,9 @@ class GameProvider with ChangeNotifier {
   int get lastPage => _lastPage;
   int get perPage => _perPage;
   int get totalGames => _totalGames;
+  Map<String, dynamic>? get roleActionTypes => _roleActionTypes;
 
+  
   // Helper method for API calls
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = await _authService.getToken();
@@ -48,6 +51,45 @@ class GameProvider with ChangeNotifier {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
+  }
+
+  // Perform game action
+  Future<Map<String, dynamic>> performAction({
+    required String gameId,
+    required String targetId,
+    required String actionType,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games/$gameId/actions'),
+        headers: headers,
+        body: jsonEncode({
+          'target_id': targetId,
+          'action_type': actionType,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final result = Map<String, dynamic>.from(jsonDecode(response.body));
+        // Refresh game details to get updated state
+        await loadGameDetails(gameId);
+        return result;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to perform action');
+      }
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   // Leave game
@@ -70,6 +112,36 @@ class GameProvider with ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Load role action types
+  Future<void> loadRoleActionTypes(String roleId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/roles/$roleId/action-types'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Store the action types directly
+        _roleActionTypes = Map<String, dynamic>.from(data);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to load role action types');
+      }
+    } catch (e) {
+      _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -114,7 +186,7 @@ class GameProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
+  
   // Load single game details
   Future<void> loadGameDetails(String gameId) async {
     _isLoading = true;
@@ -123,19 +195,54 @@ class GameProvider with ChangeNotifier {
 
     try {
       final headers = await _getAuthHeaders();
+      print('Loading game details for ID: $gameId'); // Debug print
       final response = await http.get(
         Uri.parse('$_baseUrl/games/$gameId'),
         headers: headers,
       );
 
       if (response.statusCode == 200) {
-        _currentGame = Map<String, dynamic>.from(jsonDecode(response.body));
+        final data = jsonDecode(response.body);
+        print('Raw API response: $data'); // Debug print
+        
+        // Find current user's role from players array
+        if (data['currentUser'] != null && data['players'] != null) {
+          final currentUserId = data['currentUser']['id'];
+          final List<dynamic> players = data['players'];
+          
+          // Find the current player's data
+          for (var player in players) {
+            if (player['id'] == currentUserId) {
+              print('Found current player: $player'); // Debug print
+              // Copy role information from players array to currentUser
+              data['currentUser']['role'] = player['role'];
+              print('Copied role to currentUser: ${data['currentUser']['role']}'); // Debug print
+              break;
+            }
+          }
+        }
+        
+        // Store the complete response data
+        _currentGame = Map<String, dynamic>.from(data);
+        print('Stored current game: $_currentGame'); // Debug print
+        print('Stored current user: ${_currentGame?['currentUser']}'); // Debug print
+        print('Stored current user role: ${_currentGame?['currentUser']?['role']}'); // Debug print
+        
+        // If user has a role with an ID and is not game master, load their action types
+        if (_currentGame?['currentUser']?['role']?['id'] != null && 
+            _currentGame?['currentUser']?['isGameMaster'] == false) {
+          print('Loading role action types for role: ${_currentGame!['currentUser']['role']}'); // Debug print
+          await loadRoleActionTypes(_currentGame!['currentUser']['role']['id'].toString());
+        } else {
+          print('Not loading role action types - role: ${_currentGame?['currentUser']?['role']}, isGameMaster: ${_currentGame?['currentUser']?['isGameMaster']}'); // Debug print
+        }
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Failed to load game details');
       }
     } catch (e) {
       _error = e.toString();
+      print('Error loading game details: $e'); // Debug print
     } finally {
       _isLoading = false;
       notifyListeners();
