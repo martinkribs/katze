@@ -50,6 +50,32 @@ class GameProvider with ChangeNotifier {
     };
   }
 
+  // Leave game
+  Future<void> leaveGame(String gameId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games/$gameId/leave'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to leave game');
+      }
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Load games list with pagination support
   Future<void> loadGames({int page = 1, int perPage = 10}) async {
     _isLoading = true;

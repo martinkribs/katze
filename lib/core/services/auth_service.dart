@@ -12,6 +12,7 @@ class AuthService {
   static const String _userNameKey = 'user_name';
   static const String _userEmailKey = 'user_email';
   static const String _refreshTokenKey = 'refresh_token';
+  static const String _tokenExpiryKey = 'token_expiry';
 
   // Encryption key for additional security (you should generate this securely)
   static const _encryptionKey = 'your_secure_encryption_key';
@@ -22,6 +23,51 @@ class AuthService {
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
+
+  // Get current authentication token with automatic refresh
+  Future<String?> getToken() async {
+    final token = await _storage.read(key: _tokenKey, aOptions: _secureOptions);
+    if (token == null) return null;
+
+    // Check if token needs refresh (refresh 5 minutes before expiry)
+    final expiryStr = await _storage.read(key: _tokenExpiryKey, aOptions: _secureOptions);
+    if (expiryStr != null) {
+      final expiry = DateTime.parse(expiryStr);
+      if (DateTime.now().isAfter(expiry.subtract(const Duration(minutes: 5)))) {
+        // Token is about to expire or has expired, try to refresh
+        final newToken = await _refreshToken();
+        return newToken;
+      }
+    }
+
+    return token;
+  }
+
+  // Delete account
+  Future<void> deleteAccount() async {
+    final token = await getToken();
+    if (token == null) {
+      throw const AuthException('No authentication token found');
+    }
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/user'),
+        headers: _getAuthHeaders(token),
+      );
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Failed to delete account');
+      }
+
+      // Clear all secure storage after successful deletion
+      await _storage.deleteAll(aOptions: _secureOptions);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Failed to delete account: ${e.toString()}');
+    }
+  }
 
   // Verify email with code
   Future<bool> verifyEmail(String code) async {
@@ -63,20 +109,6 @@ class AuthService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else if (response.statusCode == 401) {
-        // Token expired, try to refresh
-        final newToken = await _refreshToken();
-        if (newToken != null) {
-          // Retry with new token
-          final retryResponse = await http.get(
-            Uri.parse('$_baseUrl/user'),
-            headers: _getAuthHeaders(newToken),
-          );
-          if (retryResponse.statusCode == 200) {
-            return jsonDecode(retryResponse.body);
-          }
-        }
-        throw const AuthException('Session expired, please login again');
       } else {
         final error = jsonDecode(response.body);
         throw AuthException(error['message'] ?? 'Failed to get user data');
@@ -206,6 +238,14 @@ class AuthService {
       await _storage.write(
         key: _tokenKey,
         value: userData['access_token'],
+        aOptions: _secureOptions,
+      );
+
+      // Save token expiry
+      final expiry = DateTime.now().add(const Duration(hours: 1));
+      await _storage.write(
+        key: _tokenExpiryKey,
+        value: expiry.toIso8601String(),
         aOptions: _secureOptions,
       );
     }
@@ -360,11 +400,6 @@ class AuthService {
     
     // Clear all secure storage
     await _storage.deleteAll(aOptions: _secureOptions);
-  }
-
-  // Get current authentication token
-  Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey, aOptions: _secureOptions);
   }
 
   // Check if user is logged in

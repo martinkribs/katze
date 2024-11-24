@@ -29,6 +29,96 @@ class _GamePageState extends State<GamePage> {
     });
   }
 
+  Future<void> _confirmLeaveGame(BuildContext context, GameProvider gameProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Leave Game'),
+          content: const Text('Are you sure you want to leave this game?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Leave',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await gameProvider.leaveGame(widget.gameId.toString());
+        if (mounted) {
+          // Refresh games list and navigate back
+          await gameProvider.loadGames();
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Successfully left the game')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to leave game: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Game'),
+          content: const Text('Are you sure you want to delete this game? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await gameProvider.deleteGame(widget.gameId.toString());
+        if (mounted) {
+          // Refresh games list before navigating back
+          await gameProvider.loadGames();
+          Navigator.of(context).pop(); // Return to games list
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Game deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete game: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _shareInvite(
       BuildContext context, GameProvider gameProvider) async {
     if (gameProvider.currentGame == null) return;
@@ -84,51 +174,6 @@ class _GamePageState extends State<GamePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to generate invite link: $e')),
         );
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Game'),
-          content: const Text('Are you sure you want to delete this game? This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true && mounted) {
-      try {
-        await gameProvider.deleteGame(widget.gameId.toString());
-        if (mounted) {
-          // Refresh games list before navigating back
-          await gameProvider.loadGames();
-          Navigator.of(context).pop(); // Return to games list
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Game deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete game: $e')),
-          );
-        }
       }
     }
   }
@@ -225,24 +270,30 @@ class _GamePageState extends State<GamePage> {
           appBar: AppBar(
             title: Text(gameData?['name'] ?? 'Game Details'),
             actions: [
-              if (gameData != null &&
-                  gameData['currentUserRole']['isGameMaster']) ...[
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => GameSettingsPage(
-                          gameId: widget.gameId,
+              if (gameData != null) ...[
+                if (gameData['currentUserRole']['isGameMaster']) ...[
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => GameSettingsPage(
+                            gameId: widget.gameId,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () => _confirmDelete(context, gameProvider),
-                ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => _confirmDelete(context, gameProvider),
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.exit_to_app),
+                    onPressed: () => _confirmLeaveGame(context, gameProvider),
+                  ),
+                ],
               ],
             ],
           ),
