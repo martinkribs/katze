@@ -15,7 +15,7 @@ class _CreateGamePageState extends State<CreateGamePage> {
   final _gameNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _selectedTimezone;
-  bool _isPrivate = false;
+  final bool _isPrivate = false;
   final _formKey = GlobalKey<FormState>();
 
   // Filtered list of time zones
@@ -134,7 +134,13 @@ class _CreateGamePageState extends State<CreateGamePage> {
                       dropdownStyleData: DropdownStyleData(
                         maxHeight: 300,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(14),
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                        ),
+                        scrollbarTheme: ScrollbarThemeData(
+                          radius: const Radius.circular(40),
+                          thickness: WidgetStateProperty.all(6),
+                          thumbVisibility: WidgetStateProperty.all(true),
                         ),
                       ),
                       menuItemStyleData: const MenuItemStyleData(
@@ -142,16 +148,6 @@ class _CreateGamePageState extends State<CreateGamePage> {
                       ),
                     );
                   }
-                },
-              ),
-              const SizedBox(height: 30),
-              SwitchListTile(
-                title: const Text('Private Game'),
-                value: _isPrivate,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isPrivate = value;
-                  });
                 },
               ),
               const SizedBox(height: 30),
@@ -180,17 +176,30 @@ class _CreateGamePageState extends State<CreateGamePage> {
         );
 
         if (mounted && gameProvider.currentGame != null) {
-          // Navigate to the game page
-          Navigator.pushReplacementNamed(
-            context,
-            '/game',
-            arguments: gameProvider.currentGame!['gameId'],
-          );
+          final gameId = gameProvider.currentGame!['gameId'];
+          if (gameId != null) {
+            // Load full game details before navigating
+            await gameProvider.loadGameDetails(gameId.toString());
+            
+            // Refresh games list
+            await gameProvider.loadGames();
+            
+            // Navigate to the game page
+            Navigator.pushReplacementNamed(
+              context,
+              '/game',
+              arguments: gameId,
+            );
+          } else {
+            throw Exception('Game ID not found in response');
+          }
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create game: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to create game: $e')),
+          );
+        }
       }
     }
   }

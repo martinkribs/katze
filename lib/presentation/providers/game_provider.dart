@@ -1,7 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:katze/core/services/auth_service.dart';
+
+import '../../core/services/deep_link_service.dart';
 
 class GameProvider with ChangeNotifier {
   static const String _baseUrl = 'http://10.0.2.2:8000/api';
@@ -9,6 +12,8 @@ class GameProvider with ChangeNotifier {
 
   List<Map<String, dynamic>> _games = [];
   Map<String, dynamic>? _currentGame;
+  List<Map<String, dynamic>> _roles = [];
+  Map<String, dynamic>? _currentGameSettings;
   bool _isLoading = false;
   String? _error;
 
@@ -22,19 +27,14 @@ class GameProvider with ChangeNotifier {
 
   // Getters
   List<Map<String, dynamic>> get games => _games;
-
   Map<String, dynamic>? get currentGame => _currentGame;
-
+  List<Map<String, dynamic>> get roles => _roles;
+  Map<String, dynamic>? get currentGameSettings => _currentGameSettings;
   bool get isLoading => _isLoading;
-
   String? get error => _error;
-
   int get currentPage => _currentPage;
-
   int get lastPage => _lastPage;
-
   int get perPage => _perPage;
-
   int get totalGames => _totalGames;
 
   // Helper method for API calls
@@ -116,8 +116,106 @@ class GameProvider with ChangeNotifier {
     }
   }
 
+  // Load game settings
+  Future<void> loadGameSettings(String gameId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/games/$gameId/settings'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _currentGameSettings = Map<String, dynamic>.from(data['settings']);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to load game settings');
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Load available roles
+  Future<void> loadRoles() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/roles'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rolesData = data['roles'] as Map<String, dynamic>;
+        
+        // Flatten roles from all teams into a single list
+        _roles = [];
+        for (var teamRoles in rolesData.values) {
+          final List<dynamic> teamRolesList = teamRoles;
+          _roles.addAll(teamRolesList.map((role) => Map<String, dynamic>.from(role)));
+        }
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to load roles');
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Update game settings
+  Future<void> updateGameSettings({
+    required String gameId,
+    required bool useDefault,
+    required Map<String, int> roleConfiguration,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse('$_baseUrl/games/$gameId/settings'),
+        headers: headers,
+        body: jsonEncode({
+          'use_default': useDefault,
+          'role_configuration': roleConfiguration,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await loadGameSettings(gameId);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to update game settings');
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Create new game
-  Future<int> createGame({
+  Future<void> createGame({
     required String name,
     required String description,
     required bool isPrivate,
@@ -141,8 +239,7 @@ class GameProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        final data = Map<String, dynamic>.from(jsonDecode(response.body));
-        return data['gameId'] as int;
+        _currentGame = Map<String, dynamic>.from(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Failed to create game');
@@ -157,31 +254,26 @@ class GameProvider with ChangeNotifier {
     }
   }
 
-  // Update game settings
-  Future<void> updateGameSettings({
-    required String gameId,
-    required Map<String, dynamic> settings,
-  }) async {
+  // Delete game
+  Future<void> deleteGame(String gameId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.put(
-        Uri.parse('$_baseUrl/games/$gameId/settings'),
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/games/$gameId'),
         headers: headers,
-        body: jsonEncode(settings),
       );
 
-      if (response.statusCode == 200) {
-        await loadGameDetails(gameId);
-      } else {
+      if (response.statusCode != 200) {
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to update game settings');
+        throw Exception(error['message'] ?? 'Failed to delete game');
       }
     } catch (e) {
       _error = e.toString();
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -277,7 +369,7 @@ class GameProvider with ChangeNotifier {
   Future<String> generateWhatsAppShareText(
       String gameId, String gameName) async {
     final inviteData = await createInviteLink(gameId);
-    return 'Join my Cat Game "$gameName"! Click here to join: ${inviteData['inviteLink']}';
+    return 'Join my Cat Game "$gameName"! Click here to join: ${DeepLinkService.generateGameInviteLink(inviteData['token'])}';
   }
 
   // Clear current game

@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
+  // font sizes
+  static const double bodyLarge = 20;
+  static const double bodyMedium = 18;
+  static const double titleLarge = 24;
+  static const double titleMedium = 20;
+  static const double labelLarge = 16;
+
   // Dark Mode Colors
   static const Color darkBackground = Color(0xFF111827);
   static const Color darkContrast = Color(0xFF1F2937);
@@ -25,15 +32,24 @@ class AppColors {
     appBarTheme: const AppBarTheme(
       backgroundColor: darkBackground,
       foregroundColor: darkAccent,
+      titleTextStyle: TextStyle(
+        color: darkAccent,
+        fontSize: titleLarge,
+        fontWeight: FontWeight.normal,
+      ),
     ),
     textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: darkText),
-      bodyMedium: TextStyle(color: darkText),
+      bodyLarge: TextStyle(color: darkText, fontSize: bodyLarge),
+      bodyMedium: TextStyle(color: darkText, fontSize: bodyMedium),
+      titleLarge: TextStyle(color: darkText, fontSize: titleLarge),
+      titleMedium: TextStyle(color: darkText, fontSize: titleMedium),
+      labelLarge: TextStyle(fontSize: labelLarge),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: darkAccent,
         foregroundColor: darkBackground,
+        textStyle: const TextStyle(fontSize: bodyLarge),
       ),
     ),
     cardTheme: const CardTheme(
@@ -50,7 +66,7 @@ class AppColors {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: darkAccent, width: 2),
       ),
-      labelStyle: const TextStyle(color: darkText),
+      labelStyle: const TextStyle(color: darkText, fontSize: bodyLarge),
       prefixIconColor: darkAccent,
     ),
   );
@@ -68,15 +84,24 @@ class AppColors {
     appBarTheme: const AppBarTheme(
       backgroundColor: lightBackground,
       foregroundColor: lightAccent,
+      titleTextStyle: TextStyle(
+        color: lightAccent,
+        fontSize: titleLarge,
+        fontWeight: FontWeight.normal,
+      ),
     ),
     textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: lightText),
-      bodyMedium: TextStyle(color: lightText),
+      bodyLarge: TextStyle(color: lightText, fontSize: bodyLarge),
+      bodyMedium: TextStyle(color: lightText, fontSize: bodyMedium),
+      titleLarge: TextStyle(color: lightText, fontSize: titleLarge),
+      titleMedium: TextStyle(color: lightText, fontSize: titleMedium),
+      labelLarge: TextStyle(fontSize: labelLarge),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: lightAccent,
         foregroundColor: lightBackground,
+        textStyle: const TextStyle(fontSize: bodyLarge),
       ),
     ),
     cardTheme: const CardTheme(
@@ -93,7 +118,7 @@ class AppColors {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: lightAccent, width: 2),
       ),
-      labelStyle: const TextStyle(color: lightText),
+      labelStyle: const TextStyle(color: lightText, fontSize: bodyLarge),
       prefixIconColor: lightAccent,
     ),
   );

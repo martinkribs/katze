@@ -15,57 +15,66 @@ class GameSettingsPage extends StatefulWidget {
 }
 
 class _GameSettingsPageState extends State<GameSettingsPage> {
-  // Role distribution
-  double _villagerCount = 3.0;
-  double _catCount = 1.0;
-  bool _includeSeer = false;
-  bool _includeWitch = false;
-  bool _includeHunter = false;
-
-  // Game rules
-  bool _allowNightChat = false;
-  int _votingTime = 60; // seconds
-  int _nightTime = 30; // seconds
+  bool _useDefault = true;
+  Map<String, int> _roleConfiguration = {};
 
   @override
   void initState() {
     super.initState();
-    // Load current settings when available
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Load current settings and available roles when the page is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final gameProvider = context.read<GameProvider>();
-      final settings = gameProvider.currentGame?['settings'];
-      if (settings != null) {
+      await gameProvider.loadGameSettings(widget.gameId.toString());
+      await gameProvider.loadRoles();
+      
+      if (gameProvider.currentGameSettings != null) {
         setState(() {
-          _villagerCount = (settings['villagerCount'] ?? 3).toDouble();
-          _catCount = (settings['catCount'] ?? 1).toDouble();
-          _includeSeer = settings['includeSeer'] ?? false;
-          _includeWitch = settings['includeWitch'] ?? false;
-          _includeHunter = settings['includeHunter'] ?? false;
-          _allowNightChat = settings['allowNightChat'] ?? false;
-          _votingTime = settings['votingTime'] ?? 60;
-          _nightTime = settings['nightTime'] ?? 30;
+          _useDefault = gameProvider.currentGameSettings!['use_default'];
+          // Convert role configuration from Map<String, dynamic> to Map<String, int>
+          final roleConfig = gameProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
+          _roleConfiguration = roleConfig.map((key, value) => MapEntry(key, value as int));
         });
       }
     });
   }
 
+  int get _totalPlayers => _roleConfiguration.values.fold(0, (sum, quantity) => sum + quantity);
+
+  bool _canSaveSettings() {
+    if (_useDefault) return true;
+
+    // Check if there's at least one role
+    if (_roleConfiguration.isEmpty) return false;
+
+    // Find roles by ID
+    final villagerRole = context.read<GameProvider>().roles
+        .firstWhere((role) => role['key'] == 'villager', orElse: () => {});
+    final catRole = context.read<GameProvider>().roles
+        .firstWhere((role) => role['key'] == 'cat', orElse: () => {});
+
+    // Check quantities using role IDs
+    final hasVillager = villagerRole.isNotEmpty && 
+        (_roleConfiguration[villagerRole['id'].toString()] ?? 0) > 0;
+    final hasCat = catRole.isNotEmpty && 
+        (_roleConfiguration[catRole['id'].toString()] ?? 0) > 0;
+
+    return hasVillager && hasCat;
+  }
+
   void _saveSettings() async {
-    final settings = {
-      'villagerCount': _villagerCount.round(),
-      'catCount': _catCount.round(),
-      'includeSeer': _includeSeer,
-      'includeWitch': _includeWitch,
-      'includeHunter': _includeHunter,
-      'allowNightChat': _allowNightChat,
-      'votingTime': _votingTime,
-      'nightTime': _nightTime,
-    };
+    if (!_canSaveSettings()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid role configuration')),
+      );
+      return;
+    }
 
     try {
       final gameProvider = context.read<GameProvider>();
       await gameProvider.updateGameSettings(
         gameId: widget.gameId.toString(),
-        settings: settings,
+        useDefault: _useDefault,
+        roleConfiguration: _roleConfiguration,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -82,6 +91,135 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     }
   }
 
+  Widget _buildRoleList(GameProvider gameProvider) {
+    final effectiveConfiguration = 
+        gameProvider.currentGameSettings?['effective_configuration'] as Map<String, dynamic>? ?? {};
+    final effectiveMap = effectiveConfiguration.map((key, value) => MapEntry(key, value as int));
+
+    // Group roles by team
+    final Map<String, List<Map<String, dynamic>>> rolesByTeam = {};
+    for (var role in gameProvider.roles) {
+      final teamName = role['team'] ?? 'Other';
+      rolesByTeam.putIfAbsent(teamName, () => []).add(role);
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Role Settings',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                Text(
+                  'Total Players: $_totalPlayers',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('Use Default Settings'),
+              value: _useDefault,
+              onChanged: (value) {
+                setState(() {
+                  _useDefault = value;
+                  if (value) {
+                    // Reset to effective configuration when switching to default
+                    _roleConfiguration = Map<String, int>.from(effectiveMap);
+                  }
+                });
+              },
+            ),
+            const Divider(),
+            if (gameProvider.roles.isNotEmpty) ...[
+              ...rolesByTeam.entries.map((entry) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      entry.key,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  ...entry.value.map((role) {
+                    final roleId = role['id'].toString();
+                    final quantity = _roleConfiguration[roleId] ?? 0;
+
+                    return Opacity(
+                      opacity: !_useDefault ? 1.0 : 0.5,
+                      child: ListTile(
+                        enabled: !_useDefault,
+                        title: Text(role['name']),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(role['description'] ?? ''),
+                            if (role['can_use_night_action'] == true)
+                              Text(
+                                'Night Action',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.secondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: SizedBox(
+                          width: 180,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove),
+                                onPressed: !_useDefault
+                                    ? () {
+                                        setState(() {
+                                          if (quantity > 0) {
+                                            _roleConfiguration[roleId] = quantity - 1;
+                                          }
+                                        });
+                                      }
+                                    : null,
+                              ),
+                              Text('$quantity'),
+                              IconButton(
+                                icon: const Icon(Icons.add),
+                                onPressed: !_useDefault
+                                    ? () {
+                                        setState(() {
+                                          _roleConfiguration[roleId] = quantity + 1;
+                                        });
+                                      }
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
+              )).toList(),
+            ] else if (gameProvider.isLoading) ...[
+              const Center(child: CircularProgressIndicator()),
+            ] else ...[
+              const Center(child: Text('No roles available')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<GameProvider>(
@@ -96,7 +234,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
               ),
             ],
           ),
-          body: gameProvider.isLoading
+          body: gameProvider.isLoading && gameProvider.currentGameSettings == null
               ? const Center(child: CircularProgressIndicator())
               : gameProvider.error != null
                   ? Center(
@@ -110,7 +248,11 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: () => gameProvider.loadGameDetails(widget.gameId.toString()),
+                            onPressed: () async {
+                              await gameProvider.loadGameSettings(
+                                  widget.gameId.toString());
+                              await gameProvider.loadRoles();
+                            },
                             child: const Text('Retry'),
                           ),
                         ],
@@ -121,171 +263,12 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Role Distribution',
-                                    style: Theme.of(context).textTheme.titleLarge,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildRoleSlider(
-                                    label: 'Villagers',
-                                    value: _villagerCount,
-                                    min: 3,
-                                    max: 10,
-                                    onChanged: (value) {
-                                      setState(() => _villagerCount = value);
-                                    },
-                                  ),
-                                  _buildRoleSlider(
-                                    label: 'Cats',
-                                    value: _catCount,
-                                    min: 1,
-                                    max: 3,
-                                    onChanged: (value) {
-                                      setState(() => _catCount = value);
-                                    },
-                                  ),
-                                  SwitchListTile(
-                                    title: const Text('Include Seer'),
-                                    value: _includeSeer,
-                                    onChanged: (value) {
-                                      setState(() => _includeSeer = value);
-                                    },
-                                  ),
-                                  SwitchListTile(
-                                    title: const Text('Include Witch'),
-                                    value: _includeWitch,
-                                    onChanged: (value) {
-                                      setState(() => _includeWitch = value);
-                                    },
-                                  ),
-                                  SwitchListTile(
-                                    title: const Text('Include Hunter'),
-                                    value: _includeHunter,
-                                    onChanged: (value) {
-                                      setState(() => _includeHunter = value);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Game Rules',
-                                    style: Theme.of(context).textTheme.titleLarge,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  SwitchListTile(
-                                    title: const Text('Allow Night Chat'),
-                                    subtitle: const Text(
-                                        'Cats can chat during the night'),
-                                    value: _allowNightChat,
-                                    onChanged: (value) {
-                                      setState(() => _allowNightChat = value);
-                                    },
-                                  ),
-                                  ListTile(
-                                    title: const Text('Voting Time'),
-                                    subtitle: Text('$_votingTime seconds'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (_votingTime > 30) {
-                                                _votingTime -= 10;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.add),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (_votingTime < 120) {
-                                                _votingTime += 10;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  ListTile(
-                                    title: const Text('Night Time'),
-                                    subtitle: Text('$_nightTime seconds'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (_nightTime > 20) {
-                                                _nightTime -= 5;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.add),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (_nightTime < 60) {
-                                                _nightTime += 5;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                          _buildRoleList(gameProvider),
                         ],
                       ),
                     ),
         );
       },
-    );
-  }
-
-  Widget _buildRoleSlider({
-    required String label,
-    required double value,
-    required double min,
-    required double max,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$label: ${value.round()}'),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).round(),
-          label: value.round().toString(),
-          onChanged: onChanged,
-        ),
-      ],
     );
   }
 }

@@ -5,6 +5,8 @@ import 'package:katze/presentation/providers/game_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/services/deep_link_service.dart';
+
 class GamePage extends StatefulWidget {
   final int gameId;
 
@@ -27,11 +29,13 @@ class _GamePageState extends State<GamePage> {
     });
   }
 
-  Future<void> _shareInvite(BuildContext context, GameProvider gameProvider) async {
+  Future<void> _shareInvite(
+      BuildContext context, GameProvider gameProvider) async {
     if (gameProvider.currentGame == null) return;
 
     try {
-      final inviteLink = await gameProvider.createInviteLink(widget.gameId.toString());
+      final inviteLink =
+          await gameProvider.createInviteLink(widget.gameId.toString());
       final whatsAppText = await gameProvider.generateWhatsAppShareText(
         widget.gameId.toString(),
         gameProvider.currentGame!['name'] ?? 'Unnamed Game',
@@ -49,7 +53,12 @@ class _GamePageState extends State<GamePage> {
                     leading: const Icon(Icons.copy),
                     title: const Text('Copy Invite Link'),
                     onTap: () {
-                      Clipboard.setData(ClipboardData(text: inviteLink['inviteLink']));
+                      Clipboard.setData(
+                        ClipboardData(
+                          text: DeepLinkService.generateGameInviteLink(
+                              inviteLink['token']),
+                        ),
+                      );
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Invite link copied!')),
@@ -79,10 +88,55 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
+  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Game'),
+          content: const Text('Are you sure you want to delete this game? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await gameProvider.deleteGame(widget.gameId.toString());
+        if (mounted) {
+          // Refresh games list before navigating back
+          await gameProvider.loadGames();
+          Navigator.of(context).pop(); // Return to games list
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Game deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete game: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildGameDetails(Map<String, dynamic> gameData, ThemeData theme) {
     final gameDetails = gameData['gameDetails'];
     final currentUserRole = gameData['currentUserRole'];
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -111,7 +165,9 @@ class _GamePageState extends State<GamePage> {
             const SizedBox(height: 8),
             Text('Time Zone: ${gameDetails['timezone']}'),
             if (currentUserRole['isGameMaster'])
-              Text('Role: Game Master', style: theme.textTheme.titleSmall?.copyWith(color: theme.primaryColor)),
+              Text('Role: Game Master',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(color: theme.primaryColor)),
           ],
         ),
       ),
@@ -147,13 +203,6 @@ class _GamePageState extends State<GamePage> {
                     children: [
                       if (player['isGameMaster'])
                         const Chip(label: Text('Game Master')),
-                      const SizedBox(width: 8),
-                      Chip(
-                        label: Text(player['status']['connection']),
-                        backgroundColor: player['status']['connection'] == 'joined'
-                            ? Colors.green
-                            : Colors.orange,
-                      ),
                     ],
                   ),
                 );
@@ -176,7 +225,8 @@ class _GamePageState extends State<GamePage> {
           appBar: AppBar(
             title: Text(gameData?['name'] ?? 'Game Details'),
             actions: [
-              if (gameData != null && gameData['currentUserRole']['isGameMaster'])
+              if (gameData != null &&
+                  gameData['currentUserRole']['isGameMaster']) ...[
                 IconButton(
                   icon: const Icon(Icons.settings),
                   onPressed: () {
@@ -189,6 +239,11 @@ class _GamePageState extends State<GamePage> {
                     );
                   },
                 ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => _confirmDelete(context, gameProvider),
+                ),
+              ],
             ],
           ),
           body: gameProvider.isLoading
@@ -205,7 +260,8 @@ class _GamePageState extends State<GamePage> {
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: () => gameProvider.loadGameDetails(widget.gameId.toString()),
+                            onPressed: () => gameProvider
+                                .loadGameDetails(widget.gameId.toString()),
                             child: const Text('Retry'),
                           ),
                         ],
@@ -223,14 +279,17 @@ class _GamePageState extends State<GamePage> {
                               if (gameData['currentUserRole']['isGameMaster'] &&
                                   gameData['status'] == 'pending') ...[
                                 ElevatedButton.icon(
-                                  onPressed: () => _shareInvite(context, gameProvider),
+                                  onPressed: () =>
+                                      _shareInvite(context, gameProvider),
                                   icon: const Icon(Icons.share),
                                   label: const Text('Invite Players'),
                                 ),
                                 const SizedBox(height: 8),
-                                if (gameData['playerCount'] >= gameData['minPlayers'])
+                                if (gameData['playerCount'] >=
+                                    gameData['minPlayers'])
                                   ElevatedButton.icon(
-                                    onPressed: () => gameProvider.startGame(widget.gameId.toString()),
+                                    onPressed: () => gameProvider
+                                        .startGame(widget.gameId.toString()),
                                     icon: const Icon(Icons.play_arrow),
                                     label: const Text('Start Game'),
                                   )
@@ -239,7 +298,8 @@ class _GamePageState extends State<GamePage> {
                                     padding: const EdgeInsets.all(8.0),
                                     child: Text(
                                       'Need at least ${gameData['minPlayers']} players to start',
-                                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red),
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(color: Colors.red),
                                       textAlign: TextAlign.center,
                                     ),
                                   ),

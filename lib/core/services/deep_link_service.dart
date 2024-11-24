@@ -47,7 +47,7 @@ class DeepLinkService {
     if (token.isEmpty) {
       throw ArgumentError('Token cannot be empty');
     }
-    return 'katze://game-invite?token=$token';
+    return '<a href="katze://game-invite?token=$token">Join Cat Game</a>';
   }
 
   void dispose() {
