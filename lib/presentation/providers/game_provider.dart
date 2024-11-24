@@ -186,12 +186,13 @@ class GameProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rolesData = data['roles'] as Map<String, dynamic>;
-        
+
         // Flatten roles from all teams into a single list
         _roles = [];
         for (var teamRoles in rolesData.values) {
           final List<dynamic> teamRolesList = teamRoles;
-          _roles.addAll(teamRolesList.map((role) => Map<String, dynamic>.from(role)));
+          _roles.addAll(
+              teamRolesList.map((role) => Map<String, dynamic>.from(role)));
         }
       } else {
         final error = jsonDecode(response.body);

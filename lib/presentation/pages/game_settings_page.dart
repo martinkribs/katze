@@ -24,18 +24,68 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     // Load current settings and available roles when the page is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final gameProvider = context.read<GameProvider>();
-      await gameProvider.loadGameSettings(widget.gameId.toString());
-      await gameProvider.loadRoles();
+      await gameProvider.loadGameDetails(widget.gameId.toString());
       
-      if (gameProvider.currentGameSettings != null) {
-        setState(() {
-          _useDefault = gameProvider.currentGameSettings!['use_default'];
-          // Convert role configuration from Map<String, dynamic> to Map<String, int>
-          final roleConfig = gameProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
-          _roleConfiguration = roleConfig.map((key, value) => MapEntry(key, value as int));
-        });
+      // Only load settings if game is pending
+      if (gameProvider.currentGame?['status'] == 'pending') {
+        await gameProvider.loadGameSettings(widget.gameId.toString());
+        await gameProvider.loadRoles();
+        
+        if (gameProvider.currentGameSettings != null) {
+          setState(() {
+            _useDefault = gameProvider.currentGameSettings!['use_default'];
+            // Convert role configuration from Map<String, dynamic> to Map<String, int>
+            final roleConfig = gameProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
+            _roleConfiguration = roleConfig.map((key, value) => MapEntry(key, value as int));
+          });
+        }
       }
     });
+  }
+
+  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Game'),
+          content: const Text('Are you sure you want to delete this game? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await gameProvider.deleteGame(widget.gameId.toString());
+        if (mounted) {
+          // Refresh games list before navigating back
+          await gameProvider.loadGames();
+          Navigator.of(context).pop(); // Return to games list
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Game deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete game: $e')),
+          );
+        }
+      }
+    }
   }
 
   int get _totalPlayers => _roleConfiguration.values.fold(0, (sum, quantity) => sum + quantity);
@@ -137,7 +187,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
               },
             ),
             const Divider(),
-            if (gameProvider.roles.isNotEmpty) ...[
+            if (!_useDefault && gameProvider.roles.isNotEmpty) ...[
               ...rolesByTeam.entries.map((entry) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -154,61 +204,52 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                     final roleId = role['id'].toString();
                     final quantity = _roleConfiguration[roleId] ?? 0;
 
-                    return Opacity(
-                      opacity: !_useDefault ? 1.0 : 0.5,
-                      child: ListTile(
-                        enabled: !_useDefault,
-                        title: Text(role['name']),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    return ListTile(
+                      title: Text(role['key']), // Using key instead of name
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (role['can_use_night_action'] == true)
+                            Text(
+                              'Night Action',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.secondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: SizedBox(
+                        width: 180,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text(role['description'] ?? ''),
-                            if (role['can_use_night_action'] == true)
-                              Text(
-                                'Night Action',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.secondary,
-                                  fontSize: 12,
-                                ),
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () {
+                                setState(() {
+                                  if (quantity > 0) {
+                                    _roleConfiguration[roleId] = quantity - 1;
+                                  }
+                                });
+                              },
+                            ),
+                            Text('$quantity'),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () {
+                                setState(() {
+                                  _roleConfiguration[roleId] = quantity + 1;
+                                });
+                              },
+                            ),
                           ],
-                        ),
-                        trailing: SizedBox(
-                          width: 180,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove),
-                                onPressed: !_useDefault
-                                    ? () {
-                                        setState(() {
-                                          if (quantity > 0) {
-                                            _roleConfiguration[roleId] = quantity - 1;
-                                          }
-                                        });
-                                      }
-                                    : null,
-                              ),
-                              Text('$quantity'),
-                              IconButton(
-                                icon: const Icon(Icons.add),
-                                onPressed: !_useDefault
-                                    ? () {
-                                        setState(() {
-                                          _roleConfiguration[roleId] = quantity + 1;
-                                        });
-                                      }
-                                    : null,
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
-              )).toList(),
+              )),
             ] else if (gameProvider.isLoading) ...[
               const Center(child: CircularProgressIndicator()),
             ] else ...[
@@ -264,6 +305,17 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildRoleList(gameProvider),
+                          const SizedBox(height: 16),
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.delete_forever, color: Colors.red),
+                              title: const Text(
+                                'Delete Game',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                              onTap: () => _confirmDelete(context, gameProvider),
+                            ),
+                          ),
                         ],
                       ),
                     ),

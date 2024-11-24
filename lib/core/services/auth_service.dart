@@ -1,9 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+ static const String _baseUrl = 'http://10.0.2.2:8000/api';
   final _storage = const FlutterSecureStorage();
 
   // Keys for storing authentication data
@@ -24,13 +25,107 @@ class AuthService {
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
 
+  // Verify OTP
+  Future<String> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    if (!_isValidEmail(email)) {
+      throw const AuthException('Invalid email format');
+    }
+    if (otp.length != 6) {
+      throw const AuthException('OTP must be 6 digits');
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/verify-otp'),
+        headers: _getBaseHeaders(),
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['reset_token'];
+      } else {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Failed to verify OTP');
+      }
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Failed to verify OTP: ${e.toString()}');
+    }
+  }
+
+  // Reset password
+  Future<void> resetPassword({
+    required String email,
+    required String password,
+    required String resetToken,
+  }) async {
+    if (!_isValidEmail(email)) {
+      throw const AuthException('Invalid email format');
+    }
+    if (!_isStrongPassword(password)) {
+      throw const AuthException('Password must be at least 8 characters');
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/reset-password'),
+        headers: _getBaseHeaders(),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'password_confirmation': password,
+          'reset_token': resetToken,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Failed to reset password');
+      }
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Failed to reset password: ${e.toString()}');
+    }
+  }
+
+  // Forgot password
+  Future<void> forgotPassword(String email) async {
+    if (!_isValidEmail(email)) {
+      throw const AuthException('Invalid email format');
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/forgot-password'),
+        headers: _getBaseHeaders(),
+        body: jsonEncode({'email': email}),
+      );
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw AuthException(error['message'] ?? 'Failed to process forgot password request');
+      }
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Failed to process forgot password request: ${e.toString()}');
+    }
+  }
+
   // Get current authentication token with automatic refresh
   Future<String?> getToken() async {
     final token = await _storage.read(key: _tokenKey, aOptions: _secureOptions);
     if (token == null) return null;
 
     // Check if token needs refresh (refresh 5 minutes before expiry)
-    final expiryStr = await _storage.read(key: _tokenExpiryKey, aOptions: _secureOptions);
+    final expiryStr =
+        await _storage.read(key: _tokenExpiryKey, aOptions: _secureOptions);
     if (expiryStr != null) {
       final expiry = DateTime.parse(expiryStr);
       if (DateTime.now().isAfter(expiry.subtract(const Duration(minutes: 5)))) {
@@ -164,12 +259,13 @@ class AuthService {
     required String password,
   }) async {
     if (await _isRateLimited()) {
-      throw const AuthException('Too many login attempts. Please try again later.');
+      throw const AuthException(
+          'Too many login attempts. Please try again later.');
     }
 
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/login'),
+        Uri.parse('$_baseUrl/login?XDEBUG_SESSION=PHPSTORM'),
         headers: _getBaseHeaders(),
         body: jsonEncode({
           'email': email,
@@ -187,17 +283,12 @@ class AuthService {
         } catch (e) {
           print('JSON Parse Error: $e');
           print('Response Body: $responseBody');
-          throw AuthException('Invalid response format from server');
+          throw const AuthException('Invalid response format from server');
         }
       } else {
         await _incrementLoginAttempts();
-        try {
-          final error = jsonDecode(responseBody);
-          throw AuthException(error['message'] ?? 'Login failed');
-        } catch (e) {
-          print('Error Response Body: $responseBody');
-          throw AuthException('Login failed: Invalid server response');
-        }
+        final error = jsonDecode(responseBody);
+        throw AuthException(error['error'] ?? 'Login failed');
       }
     } catch (e) {
       if (e is AuthException) {
@@ -397,7 +488,7 @@ class AuthService {
         print('Logout endpoint failed: ${e.toString()}');
       }
     }
-    
+
     // Clear all secure storage
     await _storage.deleteAll(aOptions: _secureOptions);
   }

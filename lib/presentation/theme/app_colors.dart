@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 class AppColors {
   // font sizes
   static const double bodyLarge = 20;
-  static const double bodyMedium = 18;
-  static const double titleLarge = 24;
+  static const double bodyMedium = 16;
+  static const double titleLarge = 26;
   static const double titleMedium = 20;
   static const double labelLarge = 16;
 

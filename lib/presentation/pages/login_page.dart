@@ -6,6 +6,7 @@ import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/pages/games_overview_page.dart';
 import 'package:katze/presentation/pages/registration_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
+import 'package:katze/presentation/pages/forgot_password_page.dart';
 
 class LoginState extends ChangeNotifier {
   final AuthService _authService;
@@ -182,6 +183,19 @@ class _LoginView extends StatelessWidget {
                     }
                     return null;
                   },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordPage(),
+                        ),
+                      );
+                    },
+                    child: const Text('Forgot Password?'),
+                  ),
                 ),
                 const SizedBox(height: 30),
                 loginState.isLoading
