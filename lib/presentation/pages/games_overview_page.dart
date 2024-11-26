@@ -62,7 +62,8 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
     });
   }
 
-  List<Map<String, dynamic>> _getFilteredGames(List<Map<String, dynamic>> games) {
+  List<Map<String, dynamic>> _getFilteredGames(
+      List<Map<String, dynamic>> games) {
     if (_selectedFilters.contains(GameStatus.all)) {
       return games;
     }
@@ -109,8 +110,8 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
     return Tooltip(
       message: tooltip,
       child: Container(
-        width: 12,
-        height: 12,
+        width: 16,
+        height: 16,
         decoration: BoxDecoration(
           color: dotColor,
           shape: BoxShape.circle,
@@ -122,15 +123,14 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
   Widget _buildPaginationControls(GameProvider gameProvider) {
     final totalPages = gameProvider.lastPage;
     final currentPage = gameProvider.currentPage;
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
           icon: const Icon(Icons.first_page),
-          onPressed: currentPage > 1
-              ? () => gameProvider.loadGames(page: 1)
-              : null,
+          onPressed:
+              currentPage > 1 ? () => gameProvider.loadGames(page: 1) : null,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_left),
@@ -190,7 +190,8 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
               preferredSize: const Size.fromHeight(60),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: GameStatus.values.map((status) {
                     final isSelected = _selectedFilters.contains(status);
@@ -200,9 +201,12 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
                         label: Text(status.displayName),
                         selected: isSelected,
                         onSelected: (_) => _toggleFilter(status),
-                        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                        selectedColor: Theme.of(context).primaryColor.withOpacity(0.8),
-                        checkmarkColor: Theme.of(context).textTheme.bodyLarge?.color,
+                        backgroundColor:
+                            Theme.of(context).scaffoldBackgroundColor,
+                        selectedColor:
+                            Theme.of(context).primaryColor.withOpacity(0.8),
+                        checkmarkColor:
+                            Theme.of(context).textTheme.bodyLarge?.color,
                         labelStyle: TextStyle(
                           color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
@@ -249,7 +253,8 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
                                 const SizedBox(height: 16),
                                 if (!_selectedFilters.contains(GameStatus.all))
                                   ElevatedButton(
-                                    onPressed: () => _toggleFilter(GameStatus.all),
+                                    onPressed: () =>
+                                        _toggleFilter(GameStatus.all),
                                     child: const Text('Show all games'),
                                   )
                                 else
@@ -271,20 +276,14 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
                             children: [
                               Expanded(
                                 child: ListView.builder(
+                                  padding: const EdgeInsets.all(16),
                                   itemCount: filteredGames.length,
                                   itemBuilder: (context, index) {
                                     final game = filteredGames[index];
                                     return Card(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                      child: ListTile(
-                                        title: Text(game['name'] ?? 'Unnamed Game'),
-                                        subtitle: Text(
-                                          'Players: ${game['playerCount'] ?? 0}',
-                                        ),
-                                        trailing: _buildGameStatusDot(game['status']),
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      elevation: 4,
+                                      child: InkWell(
                                         onTap: () {
                                           Navigator.of(context).push(
                                             MaterialPageRoute(
@@ -294,6 +293,36 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
                                             ),
                                           );
                                         },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      game['name'] ?? 'Unnamed Game',
+                                                      style: Theme.of(context).textTheme.titleLarge,
+                                                    ),
+                                                  ),
+                                                  _buildGameStatusDot(game['status']),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.people, size: 20),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    '${game['playerCount'] ?? 0} Players',
+                                                    style: Theme.of(context).textTheme.bodyLarge,
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     );
                                   },

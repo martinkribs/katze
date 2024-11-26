@@ -22,6 +22,49 @@ class PlayerList extends StatelessWidget {
     this.gameDetails,
   });
 
+  Future<void> _confirmKick(BuildContext context, Map<String, dynamic> player) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Kick Player'),
+          content: Text('Are you sure you want to kick ${player['name']}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Kick',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        final gameProvider = context.read<GameProvider>();
+        await gameProvider.kickPlayer(gameId, player['id'].toString());
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${player['name']} has been kicked from the game')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to kick player: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -41,6 +84,9 @@ class PlayerList extends StatelessWidget {
                 actionTypes.any((action) => action['is_day_action'] == true)) ||
             (!isDay &&
                 actionTypes.any((action) => action['is_day_action'] == false)));
+
+    final bool isGameMaster = currentUser['isGameMaster'] == true;
+    final bool isPending = gameStatus == 'pending';
 
     return Card(
       child: Padding(
@@ -204,8 +250,18 @@ class PlayerList extends StatelessWidget {
                         ),
                       ],
                     ),
-                    trailing: canTarget && availableActions.isNotEmpty
-                        ? IconButton(
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isGameMaster && isPending && !isCurrentUser && !player['isGameMaster'])
+                          IconButton(
+                            icon: const Icon(Icons.person_remove),
+                            color: Colors.red,
+                            onPressed: () => _confirmKick(context, player),
+                            tooltip: 'Kick Player',
+                          ),
+                        if (canTarget && availableActions.isNotEmpty)
+                          IconButton(
                             icon: const Icon(Icons.play_circle_outline, size: 30),
                             color: Colors.blue,
                             onPressed: () {
@@ -219,8 +275,9 @@ class PlayerList extends StatelessWidget {
                                 ),
                               );
                             },
-                          )
-                        : null,
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },

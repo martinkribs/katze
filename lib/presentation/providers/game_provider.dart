@@ -52,6 +52,35 @@ class GameProvider with ChangeNotifier {
     };
   }
 
+  // Kick player from game
+  Future<void> kickPlayer(String gameId, String playerId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/games/$gameId/kick/$playerId'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to kick player');
+      }
+
+      // Refresh game details after kicking player
+      await loadGameDetails(gameId);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Perform game action
   Future<Map<String, dynamic>> performAction({
     required String gameId,

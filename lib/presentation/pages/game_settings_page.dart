@@ -43,6 +43,108 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     });
   }
 
+  void _showRoleInfo(BuildContext context, Map<String, dynamic> role) async {
+    // Load action types for this role
+    final gameProvider = context.read<GameProvider>();
+    await gameProvider.loadRoleActionTypes(role['id'].toString());
+    
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(role['key'].toString().toUpperCase()),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (role['description'] != null) ...[
+                  Text(
+                    'Description',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(role['description'].toString()),
+                  const SizedBox(height: 16),
+                ],
+                Text(
+                  'Team',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(role['team'] ?? 'No team'),
+                const SizedBox(height: 16),
+                Text(
+                  'Abilities',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (role['can_use_night_action'] == true)
+                  const Text('• Can perform night actions'),
+                if (role['can_vote'] == true)
+                  const Text('• Can vote during day phase'),
+                const SizedBox(height: 16),
+                Text(
+                  'Action Types',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Consumer<GameProvider>(
+                  builder: (context, gameProvider, _) {
+                    final actionTypes = gameProvider.roleActionTypes?['action_types'] ?? [];
+                    if (actionTypes.isEmpty) {
+                      return const Text('No special actions');
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ...actionTypes.map((action) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '• ${action['name']}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              if (action['description'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 16),
+                                  child: Text(action['description']),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 16),
+                                child: Text(
+                                  action['is_day_action'] ? 'Day Action' : 'Night Action',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.secondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -205,7 +307,18 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                     final quantity = _roleConfiguration[roleId] ?? 0;
 
                     return ListTile(
-                      title: Text(role['key']), // Using key instead of name
+                      title: Row(
+                        children: [
+                          Text(role['key']), // Using key instead of name
+                          IconButton(
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            onPressed: () => _showRoleInfo(context, role),
+                            padding: const EdgeInsets.only(left: 8),
+                            constraints: const BoxConstraints(),
+                            splashRadius: 20,
+                          ),
+                        ],
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -220,7 +333,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                         ],
                       ),
                       trailing: SizedBox(
-                        width: 180,
+                        width: 120,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
