@@ -57,6 +57,13 @@ class AuthStateManager extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // Add method to handle logout
+  Future<void> handleLogout() async {
+    await _authService.logout();
+    _isInitialized = false;
+    await initializeAuth();
+  }
 }
 
 // Splash screen widget to handle initial auth check

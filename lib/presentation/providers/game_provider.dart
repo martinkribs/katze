@@ -39,7 +39,6 @@ class GameProvider with ChangeNotifier {
   int get totalGames => _totalGames;
   Map<String, dynamic>? get roleActionTypes => _roleActionTypes;
 
-  
   // Helper method for API calls
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = await _authService.getToken();
@@ -66,11 +65,12 @@ class GameProvider with ChangeNotifier {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.post(
-        Uri.parse('$_baseUrl/games/$gameId/actions'),
+        Uri.parse(
+            '$_baseUrl/games/$gameId/actions'),
         headers: headers,
         body: jsonEncode({
-          'target_id': targetId,
-          'action_type': actionType,
+          'targets': [targetId],
+          'action_type_id': actionType,
         }),
       );
 
@@ -117,7 +117,7 @@ class GameProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Load role action types
   Future<void> loadRoleActionTypes(String roleId) async {
     _isLoading = true;
@@ -133,7 +133,7 @@ class GameProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // Store the action types directly
         _roleActionTypes = Map<String, dynamic>.from(data);
       } else {
@@ -186,7 +186,7 @@ class GameProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Load single game details
   Future<void> loadGameDetails(String gameId) async {
     _isLoading = true;
@@ -195,7 +195,6 @@ class GameProvider with ChangeNotifier {
 
     try {
       final headers = await _getAuthHeaders();
-      print('Loading game details for ID: $gameId'); // Debug print
       final response = await http.get(
         Uri.parse('$_baseUrl/games/$gameId'),
         headers: headers,
@@ -203,38 +202,31 @@ class GameProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Raw API response: $data'); // Debug print
-        
+
         // Find current user's role from players array
         if (data['currentUser'] != null && data['players'] != null) {
           final currentUserId = data['currentUser']['id'];
           final List<dynamic> players = data['players'];
-          
+
           // Find the current player's data
           for (var player in players) {
             if (player['id'] == currentUserId) {
-              print('Found current player: $player'); // Debug print
               // Copy role information from players array to currentUser
               data['currentUser']['role'] = player['role'];
-              print('Copied role to currentUser: ${data['currentUser']['role']}'); // Debug print
               break;
             }
           }
         }
-        
+
         // Store the complete response data
         _currentGame = Map<String, dynamic>.from(data);
-        print('Stored current game: $_currentGame'); // Debug print
-        print('Stored current user: ${_currentGame?['currentUser']}'); // Debug print
-        print('Stored current user role: ${_currentGame?['currentUser']?['role']}'); // Debug print
-        
-        // If user has a role with an ID and is not game master, load their action types
-        if (_currentGame?['currentUser']?['role']?['id'] != null && 
-            _currentGame?['currentUser']?['isGameMaster'] == false) {
-          print('Loading role action types for role: ${_currentGame!['currentUser']['role']}'); // Debug print
-          await loadRoleActionTypes(_currentGame!['currentUser']['role']['id'].toString());
-        } else {
-          print('Not loading role action types - role: ${_currentGame?['currentUser']?['role']}, isGameMaster: ${_currentGame?['currentUser']?['isGameMaster']}'); // Debug print
+
+        // Load role action types if user has a role and game is in progress or user is not game master
+        if (_currentGame?['currentUser']?['role']?['id'] != null &&
+            (_currentGame?['status'] == 'in_progress' ||
+                _currentGame?['currentUser']?['isGameMaster'] == false)) {
+          await loadRoleActionTypes(
+              _currentGame!['currentUser']['role']['id'].toString());
         }
       } else {
         final error = jsonDecode(response.body);
@@ -242,7 +234,6 @@ class GameProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = e.toString();
-      print('Error loading game details: $e'); // Debug print
     } finally {
       _isLoading = false;
       notifyListeners();

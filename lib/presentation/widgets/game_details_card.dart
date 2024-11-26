@@ -35,17 +35,7 @@ class GameDetailsCard extends StatelessWidget {
               'Players: ${gameData['playerCount']} / ${gameData['minPlayers']}',
               style: theme.textTheme.titleMedium,
             ),
-            if (currentUser['isGameMaster'])
-              Text(
-                'GAME MASTER',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                  decoration: TextDecoration.underline,
-                  decorationThickness: 2,
-                ),
-              ),
-            if (!currentUser['isGameMaster'] && currentUser['role'] != null)
+            if (currentUser['role'] != null)
               Container(
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(12),
@@ -70,25 +60,6 @@ class GameDetailsCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: currentUser['status']['user'] == 'alive' 
-                              ? Colors.green 
-                              : Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            currentUser['status']['user'].toUpperCase(),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     if (currentUser['role']['description'] != null) ...[
@@ -108,7 +79,8 @@ class GameDetailsCard extends StatelessWidget {
                       ),
                     ],
                     if (currentUser['role']['can_use_day_action'] == true ||
-                        currentUser['role']['can_use_night_action'] == true) ...[
+                        currentUser['role']['can_use_night_action'] ==
+                            true) ...[
                       const SizedBox(height: 8),
                       Text(
                         'Can act during: ${_getActionTimes(currentUser['role'])}',
@@ -140,16 +112,19 @@ class GameDetailsCard extends StatelessWidget {
             ],
             if (gameData['status'] == 'in_progress') ...[
               const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const GameRulesPage(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.rule),
-                label: const Text('View Game Rules'),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const GameRulesPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.rule),
+                  label: const Text('View Game Rules'),
+                ),
               ),
             ],
           ],

@@ -187,7 +187,7 @@ class GameActionPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                    )).toList(),
+                    )),
                   ],
                 ),
               ),

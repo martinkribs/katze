@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/deep_link_service.dart';
 import 'package:katze/core/services/notification_service.dart';
+import 'package:katze/core/services/websocket_service.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
@@ -22,6 +23,7 @@ void main() async {
   final authService = AuthService();
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
+  final websocketService = WebSocketService();
   tz.initializeTimeZones();
 
   // Parallel initialisieren für bessere Performance
@@ -30,11 +32,31 @@ void main() async {
     notificationService.initialize(),
   ]);
 
+  // Connect to WebSocket
+  websocketService.connect();
+
+  // Setup WebSocket message handler
+  websocketService.onMessageReceived = (message) {
+    // Parse message and show notification
+    // Assuming message is a Map with gameId, title, and body
+    try {
+      final Map<String, dynamic> data = message as Map<String, dynamic>;
+      notificationService.showGameNotification(
+        title: data['title'] ?? 'Game Update',
+        body: data['body'] ?? 'You have a new game update',
+        gameId: data['gameId']?.toString() ?? '0',
+      );
+    } catch (e) {
+      print('Error processing WebSocket message: $e');
+    }
+  };
+
   runApp(MyApp(
     services: AppServices(
       deepLinkService: deepLinkService,
       notificationService: notificationService,
       authService: authService,
+      websocketService: websocketService,
     ),
   ));
 }
@@ -44,11 +66,13 @@ class AppServices {
   final DeepLinkService deepLinkService;
   final NotificationService notificationService;
   final AuthService authService;
+  final WebSocketService websocketService;
 
   const AppServices({
     required this.deepLinkService,
     required this.notificationService,
     required this.authService,
+    required this.websocketService,
   });
 }
 
@@ -69,6 +93,7 @@ class MyApp extends StatelessWidget {
         Provider<DeepLinkService>.value(value: services.deepLinkService),
         Provider<NotificationService>.value(
             value: services.notificationService),
+        Provider<WebSocketService>.value(value: services.websocketService),
         // State Provider
         ChangeNotifierProvider(
           create: (context) => GameProvider(services.authService),
@@ -117,7 +142,7 @@ class MyApp extends StatelessWidget {
               '/join-game': (context) {
                 final token =
                     ModalRoute.of(context)?.settings.arguments as String;
-                
+
                 // Show join game modal
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   showDialog(

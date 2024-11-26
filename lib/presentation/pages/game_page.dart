@@ -25,13 +25,12 @@ class _GamePageState extends State<GamePage> {
   Future<void> _loadGameData() async {
     final gameProvider = context.read<GameProvider>();
     await gameProvider.loadGameDetails(widget.gameId.toString());
-    
+
     // After game details are loaded, check if we need to load role action types
     final currentGame = gameProvider.currentGame;
-    if (currentGame != null && 
-        currentGame['currentUser']?['role'] != null && 
+    if (currentGame != null &&
+        currentGame['currentUser']?['role'] != null &&
         !currentGame['currentUser']['isGameMaster']) {
-      print('Loading role action types for role: ${currentGame['currentUser']['role']}'); // Debug print
       await gameProvider.loadRoleActionTypes(
         currentGame['currentUser']['role']['id'].toString(),
       );
@@ -86,52 +85,6 @@ class _GamePageState extends State<GamePage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to leave game: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(
-      BuildContext context, GameProvider gameProvider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Game'),
-          content: const Text(
-              'Are you sure you want to delete this game? This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true && mounted) {
-      try {
-        await gameProvider.deleteGame(widget.gameId.toString());
-        if (mounted) {
-          await gameProvider.loadGames();
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Game deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete game: $e')),
           );
         }
       }
@@ -202,7 +155,6 @@ class _GamePageState extends State<GamePage> {
     return Consumer<GameProvider>(
       builder: (context, gameProvider, _) {
         final gameData = gameProvider.currentGame;
-        final theme = Theme.of(context);
 
         return Scaffold(
           appBar: AppBar(
@@ -221,10 +173,6 @@ class _GamePageState extends State<GamePage> {
                         ),
                       );
                     },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () => _confirmDelete(context, gameProvider),
                   ),
                 ] else if (gameData['status'] == 'pending') ...[
                   IconButton(
@@ -274,13 +222,15 @@ class _GamePageState extends State<GamePage> {
                                 ),
                                 const SizedBox(height: 8),
                                 ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await gameProvider.startGame(widget.gameId.toString());
-                                    // Reload game data after starting
-                                    if (mounted) {
-                                      _loadGameData();
-                                    }
-                                  },
+                                  onPressed:
+                                      (gameData['players'] as List).length >= 3
+                                          ? () async {
+                                              await gameProvider.startGame(
+                                                  widget.gameId.toString());
+                                              if (!mounted) return;
+                                              _loadGameData();
+                                            }
+                                          : null,
                                   icon: const Icon(Icons.play_arrow),
                                   label: const Text('Start Game'),
                                 ),
@@ -291,7 +241,9 @@ class _GamePageState extends State<GamePage> {
                                 currentUser: gameData['currentUser'],
                                 gameId: widget.gameId.toString(),
                                 gameStatus: gameData['status'],
-                                isVotingPhase: gameData['gameDetails']['isVotingPhase'] ?? false,
+                                isVotingPhase: gameData['gameDetails']
+                                        ['isVotingPhase'] ??
+                                    false,
                                 gameDetails: gameData['gameDetails'],
                               ),
                             ],

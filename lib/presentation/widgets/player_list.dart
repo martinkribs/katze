@@ -32,18 +32,15 @@ class PlayerList extends StatelessWidget {
 
     // Check if user can perform actions
     final bool canPerformActions = isGameStarted &&
-        !currentUser['isGameMaster'] &&
         currentUser['status']['user'] == 'alive' &&
         actionTypes.isNotEmpty;
 
     // Check if actions are allowed based on time
     final bool canActNow = canPerformActions &&
         ((isDay &&
-                actionTypes
-                    .any((action) => action['can_use_day_action'] == true)) ||
+                actionTypes.any((action) => action['is_day_action'] == true)) ||
             (!isDay &&
-                actionTypes
-                    .any((action) => action['can_use_night_action'] == true)));
+                actionTypes.any((action) => action['is_day_action'] == false)));
 
     return Card(
       child: Padding(
@@ -52,17 +49,17 @@ class PlayerList extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Players',
                   style: theme.textTheme.titleLarge,
                 ),
                 if (isVotingPhase || canActNow) ...[
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                      horizontal: 12,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: isVotingPhase
@@ -82,12 +79,12 @@ class PlayerList extends StatelessWidget {
                               : Icons.play_circle_outline,
                           color:
                               isVotingPhase ? theme.primaryColor : Colors.blue,
-                          size: 16,
+                          size: 20,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         Text(
                           isVotingPhase ? 'Voting Phase' : 'Actions Available',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             color: isVotingPhase
                                 ? theme.primaryColor
                                 : Colors.blue,
@@ -119,8 +116,8 @@ class PlayerList extends StatelessWidget {
                       ]
                     : actionTypes
                         .where((action) => isDay
-                            ? action['can_use_day_action'] == true
-                            : action['can_use_night_action'] == true)
+                            ? action['is_day_action'] == true
+                            : action['is_day_action'] == false)
                         .toList();
 
                 return Container(
@@ -208,25 +205,20 @@ class PlayerList extends StatelessWidget {
                       ],
                     ),
                     trailing: canTarget && availableActions.isNotEmpty
-                        ? PopupMenuButton<Map<String, dynamic>>(
-                            icon: const Icon(Icons.play_circle_outline),
-                            onSelected: (action) {
+                        ? IconButton(
+                            icon: const Icon(Icons.play_circle_outline, size: 30),
+                            color: Colors.blue,
+                            onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (context) => GameActionPage(
                                     gameId: gameId,
                                     targetPlayer: player,
-                                    availableActions: [action],
+                                    availableActions: availableActions,
                                   ),
                                 ),
                               );
                             },
-                            itemBuilder: (context) => availableActions
-                                .map((action) => PopupMenuItem(
-                                      value: action,
-                                      child: Text(action['name']),
-                                    ))
-                                .toList(),
                           )
                         : null,
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/core/services/auth_state_manager.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -80,8 +81,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (confirmed == true && mounted) {
       try {
-        final authService = context.read<AuthService>();
-        await authService.logout();
+        final authStateManager = context.read<AuthStateManager>();
+        await authStateManager.handleLogout();
         if (mounted) {
           // Navigate to login page and clear navigation stack
           Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
