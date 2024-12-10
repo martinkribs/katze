@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:katze/core/config/app_config.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/providers/loading_provider.dart';
 
 class GameManagementProvider with ChangeNotifier {
-  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  static String get _baseUrl => AppConfig.apiBaseUrl;
   final AuthService _authService;
   final LoadingProvider _loadingProvider;
 

@@ -1,21 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../config/app_config.dart';
 
 class WebSocketService {
   WebSocketChannel? _channel;
-  final String _localUrl = 'ws://10.0.2.2:6001/app/your-pusher-key';
-  final String _prodUrl = 'wss://soketi.katze.app/your-pusher-key';
   bool _isConnected = false;
 
   // Callback for handling messages
   Function(dynamic)? onMessageReceived;
 
-  String get _websocketUrl {
-    if (kDebugMode) {
-      return _localUrl;
-    }
-    return _prodUrl;
-  }
+  String get _websocketUrl => AppConfig.websocketUrl;
 
   bool get isConnected => _isConnected;
 
