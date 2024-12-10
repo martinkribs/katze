@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
-import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/providers/loading_provider.dart';
+import 'package:katze/presentation/providers/game_management_provider.dart';
+import 'package:katze/presentation/providers/game_action_provider.dart';
+import 'package:katze/presentation/providers/game_invite_provider.dart';
 import 'package:katze/presentation/widgets/game_details_card.dart';
 import 'package:katze/presentation/widgets/player_list.dart';
 import 'package:provider/provider.dart';
@@ -23,15 +26,16 @@ class GamePage extends StatefulWidget {
 
 class _GamePageState extends State<GamePage> {
   Future<void> _loadGameData() async {
-    final gameProvider = context.read<GameProvider>();
-    await gameProvider.loadGameDetails(widget.gameId.toString());
+    final gameManagementProvider = context.read<GameManagementProvider>();
+    final gameActionProvider = context.read<GameActionProvider>();
+    await gameManagementProvider.loadGameDetails(widget.gameId.toString());
 
     // After game details are loaded, check if we need to load role action types
-    final currentGame = gameProvider.currentGame;
+    final currentGame = gameManagementProvider.currentGame;
     if (currentGame != null &&
         currentGame['currentUser']?['role'] != null &&
         !currentGame['currentUser']['isGameMaster']) {
-      await gameProvider.loadRoleActionTypes(
+      await gameActionProvider.loadRoleActionTypes(
         currentGame['currentUser']['role']['id'].toString(),
       );
     }
@@ -46,8 +50,10 @@ class _GamePageState extends State<GamePage> {
     });
   }
 
-  Future<void> _confirmLeaveGame(
-      BuildContext context, GameProvider gameProvider) async {
+  Future<void> _confirmLeaveGame(BuildContext context) async {
+    final gameActionProvider = context.read<GameActionProvider>();
+    final gameManagementProvider = context.read<GameManagementProvider>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -73,9 +79,9 @@ class _GamePageState extends State<GamePage> {
 
     if (confirmed == true && mounted) {
       try {
-        await gameProvider.leaveGame(widget.gameId.toString());
+        await gameActionProvider.leaveGame(widget.gameId.toString());
         if (mounted) {
-          await gameProvider.loadGames();
+          await gameManagementProvider.loadGames();
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Successfully left the game')),
@@ -91,16 +97,19 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
-  Future<void> _shareInvite(
-      BuildContext context, GameProvider gameProvider) async {
-    if (gameProvider.currentGame == null) return;
+  Future<void> _shareInvite(BuildContext context) async {
+    final gameManagementProvider = context.read<GameManagementProvider>();
+    final gameInviteProvider = context.read<GameInviteProvider>();
+    final currentGame = gameManagementProvider.currentGame;
+    
+    if (currentGame == null) return;
 
     try {
       final inviteLink =
-          await gameProvider.createInviteLink(widget.gameId.toString());
-      final whatsAppText = await gameProvider.generateWhatsAppShareText(
+          await gameInviteProvider.createInviteLink(widget.gameId.toString());
+      final whatsAppText = await gameInviteProvider.generateWhatsAppShareText(
         widget.gameId.toString(),
-        gameProvider.currentGame!['name'] ?? 'Unnamed Game',
+        currentGame['name'] ?? 'Unnamed Game',
       );
 
       if (mounted) {
@@ -152,9 +161,9 @@ class _GamePageState extends State<GamePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<GameProvider>(
-      builder: (context, gameProvider, _) {
-        final gameData = gameProvider.currentGame;
+    return Consumer3<LoadingProvider, GameManagementProvider, GameActionProvider>(
+      builder: (context, loadingProvider, gameManagementProvider, gameActionProvider, _) {
+        final gameData = gameManagementProvider.currentGame;
 
         return Scaffold(
           appBar: AppBar(
@@ -177,21 +186,21 @@ class _GamePageState extends State<GamePage> {
                 ] else if (gameData['status'] == 'pending') ...[
                   IconButton(
                     icon: const Icon(Icons.exit_to_app),
-                    onPressed: () => _confirmLeaveGame(context, gameProvider),
+                    onPressed: () => _confirmLeaveGame(context),
                   ),
                 ],
               ],
             ],
           ),
-          body: gameProvider.isLoading
+          body: loadingProvider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : gameProvider.error != null
+              : loadingProvider.error != null
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            gameProvider.error!,
+                            loadingProvider.error!,
                             style: const TextStyle(color: Colors.red),
                             textAlign: TextAlign.center,
                           ),
@@ -215,8 +224,7 @@ class _GamePageState extends State<GamePage> {
                               if (gameData['currentUser']['isGameMaster'] &&
                                   gameData['status'] == 'pending') ...[
                                 ElevatedButton.icon(
-                                  onPressed: () =>
-                                      _shareInvite(context, gameProvider),
+                                  onPressed: () => _shareInvite(context),
                                   icon: const Icon(Icons.share),
                                   label: const Text('Invite Players'),
                                 ),
@@ -225,7 +233,7 @@ class _GamePageState extends State<GamePage> {
                                   onPressed:
                                       (gameData['players'] as List).length >= 3
                                           ? () async {
-                                              await gameProvider.startGame(
+                                              await gameManagementProvider.startGame(
                                                   widget.gameId.toString());
                                               if (!mounted) return;
                                               _loadGameData();

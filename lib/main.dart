@@ -7,7 +7,11 @@ import 'package:katze/core/services/websocket_service.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
-import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/providers/loading_provider.dart';
+import 'package:katze/presentation/providers/game_management_provider.dart';
+import 'package:katze/presentation/providers/game_settings_provider.dart';
+import 'package:katze/presentation/providers/game_action_provider.dart';
+import 'package:katze/presentation/providers/game_invite_provider.dart';
 import 'package:katze/presentation/providers/notification_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:katze/presentation/widgets/join_game_modal.dart';
@@ -94,10 +98,43 @@ class MyApp extends StatelessWidget {
         Provider<NotificationService>.value(
             value: services.notificationService),
         Provider<WebSocketService>.value(value: services.websocketService),
-        // State Provider
+        
+        // Game-related Providers with proper dependency order
         ChangeNotifierProvider(
-          create: (context) => GameProvider(services.authService),
+          create: (_) => LoadingProvider(),
         ),
+        ChangeNotifierProxyProvider2<AuthService, LoadingProvider, GameManagementProvider>(
+          create: (context) => GameManagementProvider(
+            services.authService,
+            context.read<LoadingProvider>(),
+          ),
+          update: (_, authService, loadingProvider, previous) => previous!,
+        ),
+        ChangeNotifierProxyProvider2<AuthService, LoadingProvider, GameSettingsProvider>(
+          create: (context) => GameSettingsProvider(
+            services.authService,
+            context.read<LoadingProvider>(),
+          ),
+          update: (_, authService, loadingProvider, previous) => previous!,
+        ),
+        ChangeNotifierProxyProvider3<AuthService, LoadingProvider, GameManagementProvider, GameActionProvider>(
+          create: (context) => GameActionProvider(
+            services.authService,
+            context.read<LoadingProvider>(),
+            context.read<GameManagementProvider>(),
+          ),
+          update: (_, authService, loadingProvider, gameManagementProvider, previous) => previous!,
+        ),
+        ChangeNotifierProxyProvider3<AuthService, LoadingProvider, GameManagementProvider, GameInviteProvider>(
+          create: (context) => GameInviteProvider(
+            services.authService,
+            context.read<LoadingProvider>(),
+            context.read<GameManagementProvider>(),
+          ),
+          update: (_, authService, loadingProvider, gameManagementProvider, previous) => previous!,
+        ),
+        
+        // Other Providers
         ChangeNotifierProvider(
           create: (context) => AuthStateManager(services.authService),
         ),

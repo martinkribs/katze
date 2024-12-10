@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/providers/loading_provider.dart';
+import 'package:katze/presentation/providers/game_management_provider.dart';
+import 'package:katze/presentation/providers/game_settings_provider.dart';
+import 'package:katze/presentation/providers/game_action_provider.dart';
 import 'package:provider/provider.dart';
 
 class GameSettingsPage extends StatefulWidget {
@@ -23,19 +26,22 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     super.initState();
     // Load current settings and available roles when the page is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final gameProvider = context.read<GameProvider>();
-      await gameProvider.loadGameDetails(widget.gameId.toString());
+      final gameManagementProvider = context.read<GameManagementProvider>();
+      final gameSettingsProvider = context.read<GameSettingsProvider>();
+      final gameActionProvider = context.read<GameActionProvider>();
+
+      await gameManagementProvider.loadGameDetails(widget.gameId.toString());
       
       // Only load settings if game is pending
-      if (gameProvider.currentGame?['status'] == 'pending') {
-        await gameProvider.loadGameSettings(widget.gameId.toString());
-        await gameProvider.loadRoles();
+      if (gameManagementProvider.currentGame?['status'] == 'pending') {
+        await gameSettingsProvider.loadGameSettings(widget.gameId.toString());
+        await gameActionProvider.loadRoles();
         
-        if (gameProvider.currentGameSettings != null) {
+        if (gameSettingsProvider.currentGameSettings != null) {
           setState(() {
-            _useDefault = gameProvider.currentGameSettings!['use_default'];
+            _useDefault = gameSettingsProvider.currentGameSettings!['use_default'];
             // Convert role configuration from Map<String, dynamic> to Map<String, int>
-            final roleConfig = gameProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
+            final roleConfig = gameSettingsProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
             _roleConfiguration = roleConfig.map((key, value) => MapEntry(key, value as int));
           });
         }
@@ -45,8 +51,8 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
 
   void _showRoleInfo(BuildContext context, Map<String, dynamic> role) async {
     // Load action types for this role
-    final gameProvider = context.read<GameProvider>();
-    await gameProvider.loadRoleActionTypes(role['id'].toString());
+    final gameActionProvider = context.read<GameActionProvider>();
+    await gameActionProvider.loadRoleActionTypes(role['id'].toString());
     
     if (!mounted) return;
 
@@ -91,9 +97,9 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Consumer<GameProvider>(
-                  builder: (context, gameProvider, _) {
-                    final actionTypes = gameProvider.roleActionTypes?['action_types'] ?? [];
+                Consumer<GameActionProvider>(
+                  builder: (context, gameActionProvider, _) {
+                    final actionTypes = gameActionProvider.roleActionTypes?['action_types'] ?? [];
                     if (actionTypes.isEmpty) {
                       return const Text('No special actions');
                     }
@@ -145,7 +151,9 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, GameProvider gameProvider) async {
+  Future<void> _confirmDelete(BuildContext context) async {
+    final gameManagementProvider = context.read<GameManagementProvider>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -171,10 +179,10 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
 
     if (confirmed == true && mounted) {
       try {
-        await gameProvider.deleteGame(widget.gameId.toString());
+        await gameManagementProvider.deleteGame(widget.gameId.toString());
         if (mounted) {
           // Refresh games list before navigating back
-          await gameProvider.loadGames();
+          await gameManagementProvider.loadGames();
           Navigator.of(context).pop(); // Return to games list
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Game deleted successfully')),
@@ -199,9 +207,10 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     if (_roleConfiguration.isEmpty) return false;
 
     // Find roles by ID
-    final villagerRole = context.read<GameProvider>().roles
+    final gameActionProvider = context.read<GameActionProvider>();
+    final villagerRole = gameActionProvider.roles
         .firstWhere((role) => role['key'] == 'villager', orElse: () => {});
-    final catRole = context.read<GameProvider>().roles
+    final catRole = gameActionProvider.roles
         .firstWhere((role) => role['key'] == 'cat', orElse: () => {});
 
     // Check quantities using role IDs
@@ -222,8 +231,8 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     }
 
     try {
-      final gameProvider = context.read<GameProvider>();
-      await gameProvider.updateGameSettings(
+      final gameSettingsProvider = context.read<GameSettingsProvider>();
+      await gameSettingsProvider.updateGameSettings(
         gameId: widget.gameId.toString(),
         useDefault: _useDefault,
         roleConfiguration: _roleConfiguration,
@@ -243,14 +252,14 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     }
   }
 
-  Widget _buildRoleList(GameProvider gameProvider) {
+  Widget _buildRoleList(GameSettingsProvider gameSettingsProvider, GameActionProvider gameActionProvider) {
     final effectiveConfiguration = 
-        gameProvider.currentGameSettings?['effective_configuration'] as Map<String, dynamic>? ?? {};
+        gameSettingsProvider.currentGameSettings?['effective_configuration'] as Map<String, dynamic>? ?? {};
     final effectiveMap = effectiveConfiguration.map((key, value) => MapEntry(key, value as int));
 
     // Group roles by team
     final Map<String, List<Map<String, dynamic>>> rolesByTeam = {};
-    for (var role in gameProvider.roles) {
+    for (var role in gameActionProvider.roles) {
       final teamName = role['team'] ?? 'Other';
       rolesByTeam.putIfAbsent(teamName, () => []).add(role);
     }
@@ -289,7 +298,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
               },
             ),
             const Divider(),
-            if (!_useDefault && gameProvider.roles.isNotEmpty) ...[
+            if (!_useDefault && gameActionProvider.roles.isNotEmpty) ...[
               ...rolesByTeam.entries.map((entry) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -363,7 +372,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                   }),
                 ],
               )),
-            ] else if (gameProvider.isLoading) ...[
+            ] else if (gameSettingsProvider.currentGameSettings == null) ...[
               const Center(child: CircularProgressIndicator()),
             ] else ...[
               const Center(child: Text('No roles available')),
@@ -376,36 +385,36 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<GameProvider>(
-      builder: (context, gameProvider, _) {
+    return Consumer3<LoadingProvider, GameSettingsProvider, GameActionProvider>(
+      builder: (context, loadingProvider, gameSettingsProvider, gameActionProvider, _) {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Game Settings'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.save),
-                onPressed: gameProvider.isLoading ? null : _saveSettings,
+                onPressed: loadingProvider.isLoading ? null : _saveSettings,
               ),
             ],
           ),
-          body: gameProvider.isLoading && gameProvider.currentGameSettings == null
+          body: loadingProvider.isLoading && gameSettingsProvider.currentGameSettings == null
               ? const Center(child: CircularProgressIndicator())
-              : gameProvider.error != null
+              : loadingProvider.error != null
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            gameProvider.error!,
+                            loadingProvider.error!,
                             style: const TextStyle(color: Colors.red),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: () async {
-                              await gameProvider.loadGameSettings(
+                              await gameSettingsProvider.loadGameSettings(
                                   widget.gameId.toString());
-                              await gameProvider.loadRoles();
+                              await gameActionProvider.loadRoles();
                             },
                             child: const Text('Retry'),
                           ),
@@ -417,7 +426,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildRoleList(gameProvider),
+                          _buildRoleList(gameSettingsProvider, gameActionProvider),
                           const SizedBox(height: 16),
                           Card(
                             child: ListTile(
@@ -426,7 +435,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                                 'Delete Game',
                                 style: TextStyle(color: Colors.red),
                               ),
-                              onTap: () => _confirmDelete(context, gameProvider),
+                              onTap: () => _confirmDelete(context),
                             ),
                           ),
                         ],

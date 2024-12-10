@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:katze/presentation/pages/create_game_page.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/settings_page.dart';
-import 'package:katze/presentation/providers/game_provider.dart';
+import 'package:katze/presentation/providers/loading_provider.dart';
+import 'package:katze/presentation/providers/game_management_provider.dart';
 import 'package:provider/provider.dart';
 
 enum GameStatus {
@@ -40,7 +41,7 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
     super.initState();
     // Load games when the page is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<GameProvider>().loadGames();
+      context.read<GameManagementProvider>().loadGames();
     });
   }
 
@@ -120,9 +121,9 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
     );
   }
 
-  Widget _buildPaginationControls(GameProvider gameProvider) {
-    final totalPages = gameProvider.lastPage;
-    final currentPage = gameProvider.currentPage;
+  Widget _buildPaginationControls(GameManagementProvider gameManagementProvider) {
+    final totalPages = gameManagementProvider.lastPage;
+    final currentPage = gameManagementProvider.currentPage;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -130,12 +131,12 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
         IconButton(
           icon: const Icon(Icons.first_page),
           onPressed:
-              currentPage > 1 ? () => gameProvider.loadGames(page: 1) : null,
+              currentPage > 1 ? () => gameManagementProvider.loadGames(page: 1) : null,
         ),
         IconButton(
           icon: const Icon(Icons.chevron_left),
           onPressed: currentPage > 1
-              ? () => gameProvider.loadGames(page: currentPage - 1)
+              ? () => gameManagementProvider.loadGames(page: currentPage - 1)
               : null,
         ),
         Container(
@@ -148,13 +149,13 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
         IconButton(
           icon: const Icon(Icons.chevron_right),
           onPressed: currentPage < totalPages
-              ? () => gameProvider.loadGames(page: currentPage + 1)
+              ? () => gameManagementProvider.loadGames(page: currentPage + 1)
               : null,
         ),
         IconButton(
           icon: const Icon(Icons.last_page),
           onPressed: currentPage < totalPages
-              ? () => gameProvider.loadGames(page: totalPages)
+              ? () => gameManagementProvider.loadGames(page: totalPages)
               : null,
         ),
       ],
@@ -163,9 +164,9 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<GameProvider>(
-      builder: (context, gameProvider, _) {
-        final filteredGames = _getFilteredGames(gameProvider.games);
+    return Consumer2<LoadingProvider, GameManagementProvider>(
+      builder: (context, loadingProvider, gameManagementProvider, _) {
+        final filteredGames = _getFilteredGames(gameManagementProvider.games);
 
         return Scaffold(
           appBar: AppBar(
@@ -173,7 +174,7 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: () => gameProvider.loadGames(),
+                onPressed: () => gameManagementProvider.loadGames(),
               ),
               IconButton(
                 icon: const Icon(Icons.settings),
@@ -218,22 +219,22 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
             ),
           ),
           body: RefreshIndicator(
-            onRefresh: () => gameProvider.loadGames(),
-            child: gameProvider.isLoading
+            onRefresh: () => gameManagementProvider.loadGames(),
+            child: loadingProvider.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : gameProvider.error != null
+                : loadingProvider.error != null
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              gameProvider.error!,
+                              loadingProvider.error!,
                               style: const TextStyle(color: Colors.red),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton(
-                              onPressed: () => gameProvider.loadGames(),
+                              onPressed: () => gameManagementProvider.loadGames(),
                               child: const Text('Retry'),
                             ),
                           ],
@@ -331,7 +332,7 @@ class _GamesOverviewPageState extends State<GamesOverviewPage> {
                               if (filteredGames.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.all(16.0),
-                                  child: _buildPaginationControls(gameProvider),
+                                  child: _buildPaginationControls(gameManagementProvider),
                                 ),
                             ],
                           ),

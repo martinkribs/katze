@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:katze/presentation/pages/game_action_page.dart';
 import 'package:provider/provider.dart';
-
-import '../providers/game_provider.dart';
+import '../providers/loading_provider.dart';
+import '../providers/game_action_provider.dart';
 
 class PlayerList extends StatelessWidget {
   final List<dynamic> players;
@@ -48,8 +48,8 @@ class PlayerList extends StatelessWidget {
 
     if (confirmed == true) {
       try {
-        final gameProvider = context.read<GameProvider>();
-        await gameProvider.kickPlayer(gameId, player['id'].toString());
+        final gameActionProvider = context.read<GameActionProvider>();
+        await gameActionProvider.kickPlayer(gameId, player['id'].toString());
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${player['name']} has been kicked from the game')),
@@ -71,7 +71,7 @@ class PlayerList extends StatelessWidget {
     final bool isGameStarted = gameStatus == 'in_progress';
     final bool isDay = gameDetails?['isDay'] ?? true;
     final actionTypes =
-        context.watch<GameProvider>().roleActionTypes?['action_types'] ?? [];
+        context.watch<GameActionProvider>().roleActionTypes?['action_types'] ?? [];
 
     // Check if user can perform actions
     final bool canPerformActions = isGameStarted &&
