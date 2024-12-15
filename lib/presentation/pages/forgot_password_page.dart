@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/pages/otp_verification_page.dart';
+import 'package:katze/presentation/widgets/app_logo.dart';
+import 'package:katze/presentation/widgets/auth_form_field.dart';
+import 'package:katze/presentation/widgets/loading_button.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -80,15 +83,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset(
-                    'assets/icon/katze.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                const AppLogo(),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -98,31 +93,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                 ],
                 const SizedBox(height: 30),
-                TextFormField(
+                AuthFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                  ),
+                  labelText: 'Email',
+                  prefixIcon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
+                  validator: AuthFormField.emailValidator,
                 ),
                 const SizedBox(height: 30),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _submitForgotPassword,
-                        child: const Text('Reset Password'),
-                      ),
+                LoadingButton(
+                  isLoading: _isLoading,
+                  onPressed: _submitForgotPassword,
+                  child: const Text('Reset Password'),
+                ),
               ],
             ),
           ),

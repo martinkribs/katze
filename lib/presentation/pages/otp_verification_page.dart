@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/pages/password_reset_page.dart';
+import 'package:katze/presentation/widgets/app_logo.dart';
+import 'package:katze/presentation/widgets/loading_button.dart';
+import 'package:katze/presentation/widgets/otp_form_field.dart';
 import 'package:provider/provider.dart';
 
 class OtpVerificationPage extends StatefulWidget {
@@ -78,15 +80,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset(
-                    'assets/icon/katze.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                const AppLogo(),
                 const SizedBox(height: 20),
                 Text(
                   'Enter the 6-digit code sent to\n${widget.email}',
@@ -102,34 +96,15 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                   ),
                 ],
                 const SizedBox(height: 30),
-                TextFormField(
+                OtpFormField(
                   controller: _otpController,
-                  decoration: const InputDecoration(
-                    labelText: 'OTP Code',
-                    prefixIcon: Icon(Icons.lock_clock),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the OTP code';
-                    }
-                    if (value.length != 6) {
-                      return 'OTP must be 6 digits';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 30),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _verifyOtp,
-                        child: const Text('Verify OTP'),
-                      ),
+                LoadingButton(
+                  isLoading: _isLoading,
+                  onPressed: _verifyOtp,
+                  child: const Text('Verify OTP'),
+                ),
               ],
             ),
           ),

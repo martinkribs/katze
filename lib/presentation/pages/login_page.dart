@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:katze/presentation/widgets/app_logo.dart';
+import 'package:katze/presentation/widgets/auth_form_field.dart';
+import 'package:katze/presentation/widgets/loading_button.dart';
 import 'package:provider/provider.dart';
 import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/pages/games_overview_page.dart';
@@ -130,15 +133,7 @@ class _LoginView extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset(
-                    'assets/icon/katze.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                const AppLogo(),
                 if (loginState.errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -148,41 +143,20 @@ class _LoginView extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 30),
-                TextFormField(
+                AuthFormField(
                   controller: loginState.emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                  ),
+                  labelText: 'Email',
+                  prefixIcon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
+                  validator: AuthFormField.emailValidator,
                 ),
                 const SizedBox(height: 20),
-                TextFormField(
+                AuthFormField(
                   controller: loginState.passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
+                  labelText: 'Password',
+                  prefixIcon: Icons.lock,
+                  isPassword: true,
+                  validator: AuthFormField.passwordValidator,
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -198,14 +172,14 @@ class _LoginView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                loginState.isLoading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: () => loginState.login(context),
-                        child: const Text('Login'),
-                      ),
+                LoadingButton(
+                  isLoading: loginState.isLoading,
+                  onPressed: () => loginState.login(context),
+                  child: const Text('Login'),
+                ),
                 const SizedBox(height: 20),
-                TextButton(
+                LoadingButton.text(
+                  isLoading: false,
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

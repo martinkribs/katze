@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:katze/presentation/providers/loading_provider.dart';
 import 'package:katze/presentation/providers/game_management_provider.dart';
 import 'package:katze/presentation/providers/game_settings_provider.dart';
-import 'package:katze/presentation/providers/game_action_provider.dart';
+import 'package:katze/presentation/providers/role_info_provider.dart';
+import 'package:katze/presentation/widgets/role_settings_card.dart';
 import 'package:provider/provider.dart';
 
 class GameSettingsPage extends StatefulWidget {
@@ -24,23 +25,20 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Load current settings and available roles when the page is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final gameManagementProvider = context.read<GameManagementProvider>();
       final gameSettingsProvider = context.read<GameSettingsProvider>();
-      final gameActionProvider = context.read<GameActionProvider>();
+      final roleInfoProvider = context.read<RoleInfoProvider>();
 
       await gameManagementProvider.loadGameDetails(widget.gameId.toString());
       
-      // Only load settings if game is pending
       if (gameManagementProvider.currentGame?['status'] == 'pending') {
         await gameSettingsProvider.loadGameSettings(widget.gameId.toString());
-        await gameActionProvider.loadRoles();
+        await roleInfoProvider.loadRoles();
         
         if (gameSettingsProvider.currentGameSettings != null) {
           setState(() {
             _useDefault = gameSettingsProvider.currentGameSettings!['use_default'];
-            // Convert role configuration from Map<String, dynamic> to Map<String, int>
             final roleConfig = gameSettingsProvider.currentGameSettings!['role_configuration'] as Map<String, dynamic>;
             _roleConfiguration = roleConfig.map((key, value) => MapEntry(key, value as int));
           });
@@ -49,10 +47,15 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     });
   }
 
-  void _showRoleInfo(BuildContext context, Map<String, dynamic> role) async {
-    // Load action types for this role
-    final gameActionProvider = context.read<GameActionProvider>();
-    await gameActionProvider.loadRoleActionTypes(role['id'].toString());
+  void _showRoleInfo(BuildContext context, String roleId) async {
+    final roleInfoProvider = context.read<RoleInfoProvider>();
+    final role = roleInfoProvider.roles.firstWhere(
+      (r) => r['id'].toString() == roleId,
+      orElse: () => {},
+    );
+    if (role.isEmpty) return;
+
+    final actionTypes = await roleInfoProvider.getRoleActionTypes(roleId);
     
     if (!mounted) return;
 
@@ -97,46 +100,37 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Consumer<GameActionProvider>(
-                  builder: (context, gameActionProvider, _) {
-                    final actionTypes = gameActionProvider.roleActionTypes?['action_types'] ?? [];
-                    if (actionTypes.isEmpty) {
-                      return const Text('No special actions');
-                    }
-                    return Column(
+                if (actionTypes['action_types']?.isEmpty ?? true) ...[
+                  const Text('No special actions'),
+                ] else ...[
+                  ...((actionTypes['action_types'] as List).map((action) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ...actionTypes.map((action) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '• ${action['name']}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              if (action['description'] != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 16),
-                                  child: Text(action['description']),
-                                ),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 16),
-                                child: Text(
-                                  action['is_day_action'] ? 'Day Action' : 'Night Action',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.secondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        Text(
+                          '• ${action['name']}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        if (action['description'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: Text(action['description']),
                           ),
-                        )),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: Text(
+                            action['is_day_action'] ? 'Day Action' : 'Night Action',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.secondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  ))),
+                ],
               ],
             ),
           ),
@@ -181,9 +175,8 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
       try {
         await gameManagementProvider.deleteGame(widget.gameId.toString());
         if (mounted) {
-          // Refresh games list before navigating back
           await gameManagementProvider.loadGames();
-          Navigator.of(context).pop(); // Return to games list
+          Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Game deleted successfully')),
           );
@@ -198,22 +191,17 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     }
   }
 
-  int get _totalPlayers => _roleConfiguration.values.fold(0, (sum, quantity) => sum + quantity);
-
   bool _canSaveSettings() {
     if (_useDefault) return true;
 
-    // Check if there's at least one role
     if (_roleConfiguration.isEmpty) return false;
 
-    // Find roles by ID
-    final gameActionProvider = context.read<GameActionProvider>();
-    final villagerRole = gameActionProvider.roles
+    final roleInfoProvider = context.read<RoleInfoProvider>();
+    final villagerRole = roleInfoProvider.roles
         .firstWhere((role) => role['key'] == 'villager', orElse: () => {});
-    final catRole = gameActionProvider.roles
+    final catRole = roleInfoProvider.roles
         .firstWhere((role) => role['key'] == 'cat', orElse: () => {});
 
-    // Check quantities using role IDs
     final hasVillager = villagerRole.isNotEmpty && 
         (_roleConfiguration[villagerRole['id'].toString()] ?? 0) > 0;
     final hasCat = catRole.isNotEmpty && 
@@ -252,141 +240,14 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     }
   }
 
-  Widget _buildRoleList(GameSettingsProvider gameSettingsProvider, GameActionProvider gameActionProvider) {
-    final effectiveConfiguration = 
-        gameSettingsProvider.currentGameSettings?['effective_configuration'] as Map<String, dynamic>? ?? {};
-    final effectiveMap = effectiveConfiguration.map((key, value) => MapEntry(key, value as int));
-
-    // Group roles by team
-    final Map<String, List<Map<String, dynamic>>> rolesByTeam = {};
-    for (var role in gameActionProvider.roles) {
-      final teamName = role['team'] ?? 'Other';
-      rolesByTeam.putIfAbsent(teamName, () => []).add(role);
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Role Settings',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Text(
-                  'Total Players: $_totalPlayers',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Use Default Settings'),
-              value: _useDefault,
-              onChanged: (value) {
-                setState(() {
-                  _useDefault = value;
-                  if (value) {
-                    // Reset to effective configuration when switching to default
-                    _roleConfiguration = Map<String, int>.from(effectiveMap);
-                  }
-                });
-              },
-            ),
-            const Divider(),
-            if (!_useDefault && gameActionProvider.roles.isNotEmpty) ...[
-              ...rolesByTeam.entries.map((entry) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      entry.key,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  ...entry.value.map((role) {
-                    final roleId = role['id'].toString();
-                    final quantity = _roleConfiguration[roleId] ?? 0;
-
-                    return ListTile(
-                      title: Row(
-                        children: [
-                          Text(role['key']), // Using key instead of name
-                          IconButton(
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            onPressed: () => _showRoleInfo(context, role),
-                            padding: const EdgeInsets.only(left: 8),
-                            constraints: const BoxConstraints(),
-                            splashRadius: 20,
-                          ),
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (role['can_use_night_action'] == true)
-                            Text(
-                              'Night Action',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.secondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: SizedBox(
-                        width: 120,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                setState(() {
-                                  if (quantity > 0) {
-                                    _roleConfiguration[roleId] = quantity - 1;
-                                  }
-                                });
-                              },
-                            ),
-                            Text('$quantity'),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () {
-                                setState(() {
-                                  _roleConfiguration[roleId] = quantity + 1;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              )),
-            ] else if (gameSettingsProvider.currentGameSettings == null) ...[
-              const Center(child: CircularProgressIndicator()),
-            ] else ...[
-              const Center(child: Text('No roles available')),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Consumer3<LoadingProvider, GameSettingsProvider, GameActionProvider>(
-      builder: (context, loadingProvider, gameSettingsProvider, gameActionProvider, _) {
+    return Consumer3<LoadingProvider, GameSettingsProvider, RoleInfoProvider>(
+      builder: (context, loadingProvider, gameSettingsProvider, roleInfoProvider, _) {
+        final effectiveConfiguration = 
+            gameSettingsProvider.currentGameSettings?['effective_configuration'] as Map<String, dynamic>? ?? {};
+        final effectiveMap = effectiveConfiguration.map((key, value) => MapEntry(key, value as int));
+
         return Scaffold(
           appBar: AppBar(
             title: const Text('Game Settings'),
@@ -414,7 +275,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                             onPressed: () async {
                               await gameSettingsProvider.loadGameSettings(
                                   widget.gameId.toString());
-                              await gameActionProvider.loadRoles();
+                              await roleInfoProvider.loadRoles();
                             },
                             child: const Text('Retry'),
                           ),
@@ -426,7 +287,26 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildRoleList(gameSettingsProvider, gameActionProvider),
+                          RoleSettingsCard(
+                            useDefault: _useDefault,
+                            onDefaultChanged: (value) {
+                              setState(() {
+                                _useDefault = value;
+                                if (value) {
+                                  _roleConfiguration = Map<String, int>.from(effectiveMap);
+                                }
+                              });
+                            },
+                            roleConfiguration: _roleConfiguration,
+                            effectiveConfiguration: effectiveMap,
+                            roles: roleInfoProvider.roles,
+                            onRoleInfoPressed: (roleId) => _showRoleInfo(context, roleId),
+                            onRoleQuantityChanged: (roleId, quantity) {
+                              setState(() {
+                                _roleConfiguration[roleId] = quantity;
+                              });
+                            },
+                          ),
                           const SizedBox(height: 16),
                           Card(
                             child: ListTile(

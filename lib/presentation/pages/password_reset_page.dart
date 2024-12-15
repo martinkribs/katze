@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/presentation/widgets/app_logo.dart';
+import 'package:katze/presentation/widgets/auth_form_field.dart';
+import 'package:katze/presentation/widgets/loading_button.dart';
 import 'package:provider/provider.dart';
 
 class PasswordResetPage extends StatefulWidget {
@@ -76,15 +79,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset(
-                    'assets/icon/katze.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                const AppLogo(),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -94,55 +89,28 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                   ),
                 ],
                 const SizedBox(height: 30),
-                TextFormField(
+                AuthFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    prefixIcon: Icon(Icons.lock),
-                    helperText:
-                        'At least 8 characters with letters, numbers, and symbols',
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a new password';
-                    }
-                    if (value.length < 8) {
-                      return 'Password must be at least 8 characters';
-                    }
-                    if (!RegExp(
-                            r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]')
-                        .hasMatch(value)) {
-                      return 'Password must include letters, numbers, and symbols';
-                    }
-                    return null;
-                  },
+                  labelText: 'New Password',
+                  prefixIcon: Icons.lock,
+                  isPassword: true,
+                  validator: AuthFormField.strongPasswordValidator,
+                  helperText: 'At least 8 characters with letters, numbers, and symbols',
                 ),
                 const SizedBox(height: 20),
-                TextFormField(
+                AuthFormField(
                   controller: _confirmPasswordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please confirm your password';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icons.lock_outline,
+                  isPassword: true,
+                  confirmPasswordText: _passwordController.text,
                 ),
                 const SizedBox(height: 30),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _resetPassword,
-                        child: const Text('Reset Password'),
-                      ),
+                LoadingButton(
+                  isLoading: _isLoading,
+                  onPressed: _resetPassword,
+                  child: const Text('Reset Password'),
+                ),
               ],
             ),
           ),

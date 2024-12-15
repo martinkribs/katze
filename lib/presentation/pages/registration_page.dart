@@ -4,8 +4,10 @@ import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
 import 'package:katze/presentation/pages/login_page.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:katze/presentation/widgets/app_logo.dart';
+import 'package:katze/presentation/widgets/auth_form_field.dart';
+import 'package:katze/presentation/widgets/loading_button.dart';
 
-// State Management für Registration
 class RegistrationState extends ChangeNotifier {
   final AuthService _authService;
   bool isLoading = false;
@@ -112,11 +114,7 @@ class _RegistrationViewState extends State<_RegistrationView> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/icon/katze.png',
-                  height: 120,
-                  width: 120,
-                ),
+                const AppLogo(size: 120),
                 if (state.errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -126,22 +124,45 @@ class _RegistrationViewState extends State<_RegistrationView> {
                   ),
                 ],
                 const SizedBox(height: 30),
-                _buildUsernameField(),
+                AuthFormField(
+                  controller: _usernameController,
+                  labelText: 'Username',
+                  prefixIcon: Icons.person,
+                  validator: AuthFormField.usernameValidator,
+                ),
                 const SizedBox(height: 20),
-                _buildEmailField(),
+                AuthFormField(
+                  controller: _emailController,
+                  labelText: 'Email',
+                  prefixIcon: Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: AuthFormField.emailValidator,
+                ),
                 const SizedBox(height: 20),
-                _buildPasswordField(),
+                AuthFormField(
+                  controller: _passwordController,
+                  labelText: 'Password',
+                  prefixIcon: Icons.lock,
+                  isPassword: true,
+                  validator: AuthFormField.passwordValidator,
+                ),
                 const SizedBox(height: 20),
-                _buildConfirmPasswordField(),
+                AuthFormField(
+                  controller: _confirmPasswordController,
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icons.lock_outline,
+                  isPassword: true,
+                  confirmPasswordText: _passwordController.text,
+                ),
                 const SizedBox(height: 30),
-                state.isLoading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _register,
-                        child: const Text('Register'),
-                      ),
+                LoadingButton(
+                  isLoading: state.isLoading,
+                  onPressed: _register,
+                  child: const Text('Register'),
+                ),
                 const SizedBox(height: 20),
-                TextButton(
+                LoadingButton.text(
+                  isLoading: false,
                   onPressed: () {
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
@@ -156,83 +177,6 @@ class _RegistrationViewState extends State<_RegistrationView> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildUsernameField() {
-    return TextFormField(
-      controller: _usernameController,
-      decoration: const InputDecoration(
-        labelText: 'Username',
-        prefixIcon: Icon(Icons.person),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter a username';
-        }
-        if (value.length < 3) {
-          return 'Username must be at least 3 characters';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildEmailField() {
-    return TextFormField(
-      controller: _emailController,
-      decoration: const InputDecoration(
-        labelText: 'Email',
-        prefixIcon: Icon(Icons.email),
-      ),
-      keyboardType: TextInputType.emailAddress,
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter your email';
-        }
-        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-        if (!emailRegex.hasMatch(value)) {
-          return 'Please enter a valid email';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildPasswordField() {
-    return TextFormField(
-      controller: _passwordController,
-      decoration: const InputDecoration(
-        labelText: 'Password',
-        prefixIcon: Icon(Icons.lock),
-      ),
-      obscureText: true,
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter a password';
-        }
-        if (value.length < 6) {
-          return 'Password must be at least 6 characters';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildConfirmPasswordField() {
-    return TextFormField(
-      controller: _confirmPasswordController,
-      decoration: const InputDecoration(
-        labelText: 'Confirm Password',
-        prefixIcon: Icon(Icons.lock_outline),
-      ),
-      obscureText: true,
-      validator: (value) {
-        if (value != _passwordController.text) {
-          return 'Passwords do not match';
-        }
-        return null;
-      },
     );
   }
 

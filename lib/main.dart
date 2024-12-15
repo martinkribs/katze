@@ -13,6 +13,7 @@ import 'package:katze/presentation/providers/game_settings_provider.dart';
 import 'package:katze/presentation/providers/game_action_provider.dart';
 import 'package:katze/presentation/providers/game_invite_provider.dart';
 import 'package:katze/presentation/providers/notification_provider.dart';
+import 'package:katze/presentation/providers/role_info_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
 import 'package:katze/presentation/widgets/join_game_modal.dart';
 import 'package:provider/provider.dart';
@@ -112,6 +113,13 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProxyProvider2<AuthService, LoadingProvider, GameSettingsProvider>(
           create: (context) => GameSettingsProvider(
+            services.authService,
+            context.read<LoadingProvider>(),
+          ),
+          update: (_, authService, loadingProvider, previous) => previous!,
+        ),
+        ChangeNotifierProxyProvider2<AuthService, LoadingProvider, RoleInfoProvider>(
+          create: (context) => RoleInfoProvider(
             services.authService,
             context.read<LoadingProvider>(),
           ),

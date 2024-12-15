@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
 import '../config/app_config.dart';
 
 class WebSocketService {
@@ -16,7 +16,12 @@ class WebSocketService {
   void connect() {
     try {
       _channel = WebSocketChannel.connect(
-        Uri.parse(_websocketUrl),
+        Uri.parse(_websocketUrl).replace(
+          queryParameters: {
+            'app_key': 'TSLI9e5eMzqKzjxTGeNe',
+            'app_id': 'Katze',
+          },
+        ),
       );
       _isConnected = true;
 

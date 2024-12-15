@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:katze/presentation/pages/game_action_page.dart';
 import 'package:provider/provider.dart';
-import '../providers/loading_provider.dart';
 import '../providers/game_action_provider.dart';
 
 class PlayerList extends StatelessWidget {

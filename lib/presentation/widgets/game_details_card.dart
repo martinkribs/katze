@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:katze/presentation/pages/game_rules_page.dart';
 import 'package:katze/presentation/widgets/game_phase_display.dart';
+import 'package:intl/intl.dart';
 
 class GameDetailsCard extends StatelessWidget {
   final Map<String, dynamic> gameData;
@@ -9,6 +10,16 @@ class GameDetailsCard extends StatelessWidget {
     super.key,
     required this.gameData,
   });
+
+  String _formatDateTime(String? dateTimeStr) {
+    if (dateTimeStr == null) return '';
+    try {
+      final dateTime = DateTime.parse(dateTimeStr).toLocal();
+      return DateFormat('DD.MM.YYYY, HH:mm').format(dateTime);
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,11 +105,11 @@ class GameDetailsCard extends StatelessWidget {
               ),
             if (gameDetails['startedAt'] != null) ...[
               const SizedBox(height: 8),
-              Text('Started: ${gameDetails['startedAt']}'),
+              Text('Started: ${_formatDateTime(gameDetails['startedAt'])}'),
             ],
             if (gameDetails['completedAt'] != null) ...[
               const SizedBox(height: 8),
-              Text('Completed: ${gameDetails['completedAt']}'),
+              Text('Completed: ${_formatDateTime(gameDetails['completedAt'])}'),
             ],
             if (gameDetails['winningTeam'] != null) ...[
               const SizedBox(height: 16),

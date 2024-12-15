@@ -1,8 +1,8 @@
-import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:katze/presentation/providers/loading_provider.dart';
 import 'package:katze/presentation/providers/game_management_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:katze/presentation/widgets/timezone_dropdown.dart';
 import 'package:provider/provider.dart';
 
 class CreateGamePage extends StatefulWidget {
@@ -18,24 +18,6 @@ class _CreateGamePageState extends State<CreateGamePage> {
   String? _selectedTimezone;
   final bool _isPrivate = false;
   final _formKey = GlobalKey<FormState>();
-
-  // Filtered list of time zones
-  Future<List<DropdownMenuItem<String>>> _getFilteredTimeZones() async {
-    final filteredTimezones = [
-      'America/New_York',
-      'Europe/Berlin',
-      'Asia/Tokyo',
-      'Australia/Sydney',
-      'America/Los_Angeles',
-      'Africa/Johannesburg'
-    ];
-    return filteredTimezones.map((String timezone) {
-      return DropdownMenuItem<String>(
-        value: timezone,
-        child: Text(timezone),
-      );
-    }).toList();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,58 +79,18 @@ class _CreateGamePageState extends State<CreateGamePage> {
                     },
                   ),
                   const SizedBox(height: 30),
-                  FutureBuilder<List<DropdownMenuItem<String>>>(
-                    future: _getFilteredTimeZones(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return const Text('Error loading time zones');
-                      } else {
-                        return DropdownButtonFormField2<String>(
-                          value: _selectedTimezone,
-                          decoration: InputDecoration(
-                            labelText: 'Timezone',
-                            prefixIcon: const Icon(Icons.access_time),
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10, horizontal: 10),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          items: snapshot.data,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedTimezone = newValue;
-                            });
-                          },
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please select a timezone';
-                            }
-                            return null;
-                          },
-                          buttonStyleData: const ButtonStyleData(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            height: 60,
-                          ),
-                          dropdownStyleData: DropdownStyleData(
-                            maxHeight: 300,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                            ),
-                            scrollbarTheme: ScrollbarThemeData(
-                              radius: const Radius.circular(40),
-                              thickness: WidgetStateProperty.all(6),
-                              thumbVisibility: WidgetStateProperty.all(true),
-                            ),
-                          ),
-                          menuItemStyleData: const MenuItemStyleData(
-                            height: 48,
-                          ),
-                        );
+                  TimezoneDropdown(
+                    value: _selectedTimezone,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedTimezone = newValue;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a timezone';
                       }
+                      return null;
                     },
                   ),
                   const SizedBox(height: 30),
