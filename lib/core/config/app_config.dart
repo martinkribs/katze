@@ -4,6 +4,6 @@ class AppConfig {
   }
 
   static String get websocketUrl {
-    return 'wss://soketi.katze.app:6001/app/TSLI9e5eMzqKzjxTGeNe';
+    return 'wss://soketi.katze.app/app/TSLI9e5eMzqKzjxTGeNe';
   }
 }

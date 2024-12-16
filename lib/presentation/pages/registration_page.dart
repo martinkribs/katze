@@ -67,6 +67,15 @@ class _RegistrationViewState extends State<_RegistrationView> {
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  @override
+  void initState() {
+    super.initState();
+    // Add listener to password controller to trigger rebuild when password changes
+    _passwordController.addListener(() {
+      setState(() {});
+    });
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -182,6 +191,7 @@ class _RegistrationViewState extends State<_RegistrationView> {
 
   @override
   void dispose() {
+    _passwordController.removeListener(() {});
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
