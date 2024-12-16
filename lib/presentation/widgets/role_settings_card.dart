@@ -21,7 +21,8 @@ class RoleSettingsCard extends StatelessWidget {
     required this.onRoleQuantityChanged,
   });
 
-  int get totalPlayers => roleConfiguration.values.fold(0, (sum, quantity) => sum + quantity);
+  int get totalPlayers =>
+      roleConfiguration.values.fold(0, (sum, quantity) => sum + quantity);
 
   @override
   Widget build(BuildContext context) {
@@ -51,28 +52,32 @@ class RoleSettingsCard extends StatelessWidget {
             const Divider(),
             if (!useDefault && roles.isNotEmpty) ...[
               ...rolesByTeam.entries.map((entry) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      entry.key,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          entry.key,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                        ),
                       ),
-                    ),
-                  ),
-                  ...entry.value.map((role) {
-                    final roleId = role['id'].toString();
-                    return RoleListItem(
-                      role: role,
-                      quantity: roleConfiguration[roleId] ?? 0,
-                      onInfoPressed: () => onRoleInfoPressed(roleId),
-                      onQuantityChanged: (value) => onRoleQuantityChanged(roleId, value),
-                    );
-                  }),
-                ],
-              )),
+                      ...entry.value.map((role) {
+                        final roleId = role['id'].toString();
+                        return RoleListItem(
+                          role: role,
+                          quantity: roleConfiguration[roleId] ?? 0,
+                          onInfoPressed: () => onRoleInfoPressed(roleId),
+                          onQuantityChanged: (value) =>
+                              onRoleQuantityChanged(roleId, value),
+                        );
+                      }),
+                    ],
+                  )),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(8.0),
@@ -90,8 +95,6 @@ class RoleSettingsCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ] else if (roles.isEmpty) ...[
-              const Center(child: Text('No roles available')),
             ],
           ],
         ),

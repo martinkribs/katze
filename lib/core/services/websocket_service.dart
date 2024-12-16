@@ -1,4 +1,5 @@
 import 'package:web_socket_channel/web_socket_channel.dart';
+
 import '../config/app_config.dart';
 
 class WebSocketService {
@@ -29,16 +30,10 @@ class WebSocketService {
     }
 
     try {
-      final uri = Uri.parse(_websocketUrl).replace(
-        queryParameters: {
-          'app_key': 'TSLI9e5eMzqKzjxTGeNe',
-          'app_id': 'Katze',
-          'auth_token': _authToken,
-        },
-      );
+      final uri = Uri.parse(_websocketUrl);
 
       print('Connecting to WebSocket: $uri');
-      
+
       _channel = WebSocketChannel.connect(uri);
       _isConnected = true;
 
