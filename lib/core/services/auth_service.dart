@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:katze/core/config/app_config.dart';
+import 'websocket_service.dart';
 
 class AuthService {
   static String get _baseUrl => AppConfig.apiBaseUrl;
   final _storage = const FlutterSecureStorage();
+  final WebSocketService _websocketService;
 
   // Keys for storing authentication data
   static const String _tokenKey = 'auth_token';
@@ -25,6 +27,8 @@ class AuthService {
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
+
+  AuthService(this._websocketService);
 
   // Verify OTP
   Future<String> verifyOtp({
@@ -156,6 +160,9 @@ class AuthService {
         final error = jsonDecode(response.body);
         throw AuthException(error['message'] ?? 'Failed to delete account');
       }
+
+      // Disconnect WebSocket before clearing storage
+      _websocketService.disconnect();
 
       // Clear all secure storage after successful deletion
       await _storage.deleteAll(aOptions: _secureOptions);
@@ -326,10 +333,12 @@ class AuthService {
   // Save user data securely
   Future<void> _saveUserData(Map<String, dynamic> userData) async {
     // Save token securely
+    String? token;
     if (userData['access_token'] != null) {
+      token = userData['access_token'];
       await _storage.write(
         key: _tokenKey,
-        value: userData['access_token'],
+        value: token,
         aOptions: _secureOptions,
       );
 
@@ -368,6 +377,12 @@ class AuthService {
         value: user['email'],
         aOptions: _secureOptions,
       );
+    }
+
+    // Update WebSocket connection with new token
+    if (token != null) {
+      _websocketService.setAuthToken(token);
+      _websocketService.connect();
     }
   }
 
@@ -489,6 +504,9 @@ class AuthService {
         print('Logout endpoint failed: ${e.toString()}');
       }
     }
+
+    // Disconnect WebSocket before clearing storage
+    _websocketService.disconnect();
 
     // Clear all secure storage
     await _storage.deleteAll(aOptions: _secureOptions);

@@ -24,33 +24,37 @@ import 'core/services/auth_state_manager.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Services initialisieren
-  final authService = AuthService();
+  // Initialize services in the correct order
+  final websocketService = WebSocketService();
+  final authService = AuthService(websocketService);
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
-  final websocketService = WebSocketService();
   tz.initializeTimeZones();
 
-  // Parallel initialisieren für bessere Performance
+  // Initialize services that require async setup
   await Future.wait([
     deepLinkService.initialize(),
     notificationService.initialize(),
   ]);
 
-  // Connect to WebSocket
-  websocketService.connect();
-
   // Setup WebSocket message handler
   websocketService.onMessageReceived = (message) {
-    // Parse message and show notification
-    // Assuming message is a Map with gameId, title, and body
     try {
       final Map<String, dynamic> data = message as Map<String, dynamic>;
-      notificationService.showGameNotification(
-        title: data['title'] ?? 'Game Update',
-        body: data['body'] ?? 'You have a new game update',
-        gameId: data['gameId']?.toString() ?? '0',
-      );
+      
+      // Handle different message types
+      switch (data['type']) {
+        case 'notification':
+          notificationService.showGameNotification(
+            title: data['title'] ?? 'Game Update',
+            body: data['body'] ?? 'You have a new game update',
+            gameId: data['gameId']?.toString() ?? '0',
+          );
+          break;
+        default:
+          // Other message types will be handled by their respective providers
+          break;
+      }
     } catch (e) {
       print('Error processing WebSocket message: $e');
     }
@@ -66,7 +70,7 @@ void main() async {
   ));
 }
 
-// Neue Klasse für bessere Organisation der Services
+// Services container class
 class AppServices {
   final DeepLinkService deepLinkService;
   final NotificationService notificationService;
@@ -96,20 +100,20 @@ class MyApp extends StatelessWidget {
         // Services
         Provider<AuthService>.value(value: services.authService),
         Provider<DeepLinkService>.value(value: services.deepLinkService),
-        Provider<NotificationService>.value(
-            value: services.notificationService),
+        Provider<NotificationService>.value(value: services.notificationService),
         Provider<WebSocketService>.value(value: services.websocketService),
         
         // Game-related Providers with proper dependency order
         ChangeNotifierProvider(
           create: (_) => LoadingProvider(),
         ),
-        ChangeNotifierProxyProvider2<AuthService, LoadingProvider, GameManagementProvider>(
+        ChangeNotifierProxyProvider3<AuthService, LoadingProvider, WebSocketService, GameManagementProvider>(
           create: (context) => GameManagementProvider(
             services.authService,
             context.read<LoadingProvider>(),
+            services.websocketService,
           ),
-          update: (_, authService, loadingProvider, previous) => previous!,
+          update: (_, authService, loadingProvider, websocketService, previous) => previous!,
         ),
         ChangeNotifierProxyProvider2<AuthService, LoadingProvider, GameSettingsProvider>(
           create: (context) => GameSettingsProvider(
@@ -147,8 +151,7 @@ class MyApp extends StatelessWidget {
           create: (context) => AuthStateManager(services.authService),
         ),
         ChangeNotifierProvider(
-          create: (context) =>
-              NotificationProvider(services.notificationService),
+          create: (context) => NotificationProvider(services.notificationService),
         ),
         ChangeNotifierProvider(
           create: (context) => ThemeProvider(),
@@ -174,19 +177,16 @@ class MyApp extends StatelessWidget {
             routes: {
               '/': (context) => const AuthCheckScreen(),
               '/game': (context) {
-                final gameId =
-                    ModalRoute.of(context)?.settings.arguments as int;
+                final gameId = ModalRoute.of(context)?.settings.arguments as int;
                 return GamePage(gameId: gameId);
               },
               '/verify-email': (context) => const VerificationRequiredPage(),
               '/game-settings': (context) {
-                final gameId =
-                    ModalRoute.of(context)?.settings.arguments as int;
+                final gameId = ModalRoute.of(context)?.settings.arguments as int;
                 return GameSettingsPage(gameId: gameId);
               },
               '/join-game': (context) {
-                final token =
-                    ModalRoute.of(context)?.settings.arguments as String;
+                final token = ModalRoute.of(context)?.settings.arguments as String;
 
                 // Show join game modal
                 WidgetsBinding.instance.addPostFrameCallback((_) {

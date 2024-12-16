@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:katze/core/config/app_config.dart';
 import 'package:katze/core/services/auth_service.dart';
+import 'package:katze/core/services/websocket_service.dart';
 import 'package:katze/presentation/providers/loading_provider.dart';
 
 class GameManagementProvider with ChangeNotifier {
   static String get _baseUrl => AppConfig.apiBaseUrl;
   final AuthService _authService;
   final LoadingProvider _loadingProvider;
+  final WebSocketService _websocketService;
 
   List<Map<String, dynamic>> _games = [];
   Map<String, dynamic>? _currentGame;
@@ -19,7 +21,14 @@ class GameManagementProvider with ChangeNotifier {
   int _perPage = 10;
   int _totalGames = 0;
 
-  GameManagementProvider(this._authService, this._loadingProvider);
+  GameManagementProvider(
+    this._authService,
+    this._loadingProvider,
+    this._websocketService,
+  ) {
+    // Setup WebSocket message handler for game updates
+    _websocketService.onMessageReceived = _handleWebSocketMessage;
+  }
 
   // Getters
   List<Map<String, dynamic>> get games => _games;
@@ -28,6 +37,47 @@ class GameManagementProvider with ChangeNotifier {
   int get lastPage => _lastPage;
   int get perPage => _perPage;
   int get totalGames => _totalGames;
+
+  // WebSocket message handler
+  void _handleWebSocketMessage(dynamic message) {
+    try {
+      if (message is! Map<String, dynamic>) {
+        message = jsonDecode(message.toString());
+      }
+
+      switch (message['type']) {
+        case 'game_update':
+          if (_currentGame != null && 
+              message['gameId'].toString() == _currentGame!['id'].toString()) {
+            // Reload game details if we're currently viewing this game
+            loadGameDetails(_currentGame!['id'].toString());
+          }
+          // Refresh games list if we're on the overview
+          if (_games.isNotEmpty) {
+            loadGames(page: _currentPage, perPage: _perPage);
+          }
+          break;
+        case 'game_deleted':
+          if (_currentGame != null && 
+              message['gameId'].toString() == _currentGame!['id'].toString()) {
+            clearCurrentGame();
+          }
+          // Refresh games list
+          if (_games.isNotEmpty) {
+            loadGames(page: _currentPage, perPage: _perPage);
+          }
+          break;
+        case 'game_started':
+          if (_currentGame != null && 
+              message['gameId'].toString() == _currentGame!['id'].toString()) {
+            loadGameDetails(_currentGame!['id'].toString());
+          }
+          break;
+      }
+    } catch (e) {
+      print('Error handling WebSocket message in GameManagementProvider: $e');
+    }
+  }
 
   // Helper method for API calls
   Future<Map<String, String>> _getAuthHeaders() async {
@@ -218,5 +268,12 @@ class GameManagementProvider with ChangeNotifier {
   void clearCurrentGame() {
     _currentGame = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // Clean up WebSocket handler
+    _websocketService.onMessageReceived = null;
+    super.dispose();
   }
 }
