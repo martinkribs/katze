@@ -45,10 +45,9 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Accepts URIs that begin with "https://katze.app" -->
-                <data
-                    android:host="katze.app"
-                    android:scheme="https" />
+                <!-- Accepts URIs that begin with "https://katze.app" and "https://open.katze.app" -->
+                <data android:scheme="katze" android:host="game-invite" />
+                <data android:host="open.katze.app" android:scheme="https" />
             </intent-filter>
         </activity>
 

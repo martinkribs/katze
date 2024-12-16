@@ -12,6 +12,9 @@ class DeepLinkService {
   final _navigationKey = GlobalKey<NavigatorState>();
   final _deepLinkStreamController = StreamController<String>.broadcast();
 
+  // Play Store URL for the app
+  static const String playStoreUrl = 'https://play.google.com/store/apps/details?id=app.katze.game';
+
   GlobalKey<NavigatorState> get navigationKey => _navigationKey;
   Stream<String> get deepLinkStream => _deepLinkStreamController.stream;
 
@@ -34,8 +37,10 @@ class DeepLinkService {
   }
 
   void _handleDeepLink(Uri uri) {
-    if (uri.host == 'game-invite') {
-      final token = uri.queryParameters['token'];
+    // Handle both app scheme and https scheme
+    if (uri.host == 'open.katze.app' && uri.path.startsWith('/game-invite')) {
+      String? token = uri.queryParameters['token'];
+
       if (token != null) {
         _navigationKey.currentState?.pushNamed('/join-game', arguments: token);
         _deepLinkStreamController.add(uri.toString());
@@ -47,7 +52,8 @@ class DeepLinkService {
     if (token.isEmpty) {
       throw ArgumentError('Token cannot be empty');
     }
-    return '<a href="katze://game-invite?token=$token">Join Cat Game</a>';
+    // Generate web URL that will either open the app or redirect to Play Store
+    return 'Join Cat Game - https://open.katze.app/game-invite?token=$token';
   }
 
   void dispose() {
