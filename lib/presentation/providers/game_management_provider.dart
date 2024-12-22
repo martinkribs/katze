@@ -27,7 +27,7 @@ class GameManagementProvider with ChangeNotifier {
     this._websocketService,
   ) {
     // Setup WebSocket message handler for game updates
-    _websocketService.onMessageReceived = _handleWebSocketMessage;
+    _websocketService.addMessageHandler(_handleWebSocketMessage);
   }
 
   // Getters
@@ -273,7 +273,7 @@ class GameManagementProvider with ChangeNotifier {
   @override
   void dispose() {
     // Clean up WebSocket handler
-    _websocketService.onMessageReceived = null;
+    _websocketService.removeMessageHandler(_handleWebSocketMessage);
     super.dispose();
   }
 }

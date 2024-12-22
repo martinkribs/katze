@@ -93,56 +93,52 @@ class PlayerList extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Players',
-                  style: theme.textTheme.titleLarge,
-                ),
-                if (isVotingPhase || canActNow) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isVotingPhase
-                          ? theme.primaryColor.withOpacity(0.1)
-                          : Colors.blue.withOpacity(0.1),
-                      border: Border.all(
-                        color: isVotingPhase ? theme.primaryColor : Colors.blue,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isVotingPhase
-                              ? Icons.how_to_vote
-                              : Icons.play_circle_outline,
-                          color:
-                              isVotingPhase ? theme.primaryColor : Colors.blue,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isVotingPhase ? 'Voting Phase' : 'Actions Available',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: isVotingPhase
-                                ? theme.primaryColor
-                                : Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+            Text(
+              'Players',
+              style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
+            if (isVotingPhase || canActNow) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isVotingPhase
+                      ? theme.primaryColor.withOpacity(0.1)
+                      : Colors.blue.withOpacity(0.1),
+                  border: Border.all(
+                    color: isVotingPhase ? theme.primaryColor : Colors.blue,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isVotingPhase
+                          ? Icons.how_to_vote
+                          : Icons.play_circle_outline,
+                      color:
+                          isVotingPhase ? theme.primaryColor : Colors.blue,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isVotingPhase ? 'Voting Phase' : 'Actions Available',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: isVotingPhase
+                            ? theme.primaryColor
+                            : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),

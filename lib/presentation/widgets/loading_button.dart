@@ -56,9 +56,9 @@ class LoadingButton extends StatelessWidget {
       key: key,
       isLoading: isLoading,
       onPressed: onPressed,
-      child: child,
       style: style,
       elevated: false,
+      child: child,
     );
   }
 }

@@ -7,10 +7,13 @@ import 'package:katze/presentation/providers/game_action_provider.dart';
 import 'package:katze/presentation/providers/game_invite_provider.dart';
 import 'package:katze/presentation/widgets/game_details_card.dart';
 import 'package:katze/presentation/widgets/player_list.dart';
+import 'package:katze/presentation/widgets/chat_widget.dart';
+import 'package:katze/presentation/providers/chat_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/services/deep_link_service.dart';
+import '../../core/services/websocket_service.dart';
 
 class GamePage extends StatefulWidget {
   final int gameId;
@@ -28,7 +31,12 @@ class _GamePageState extends State<GamePage> {
   Future<void> _loadGameData() async {
     final gameManagementProvider = context.read<GameManagementProvider>();
     final gameActionProvider = context.read<GameActionProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    final websocketService = context.read<WebSocketService>();
+    
     await gameManagementProvider.loadGameDetails(widget.gameId.toString());
+    chatProvider.setCurrentGame(widget.gameId.toString());
+    websocketService.subscribeToGameChannel(widget.gameId.toString());
 
     // After game details are loaded, check if we need to load role action types
     final currentGame = gameManagementProvider.currentGame;
@@ -244,6 +252,30 @@ class _GamePageState extends State<GamePage> {
                                 ),
                               ],
                               const SizedBox(height: 16),
+                              if (gameData['status'] == 'in_progress') ...[
+                                SizedBox(
+                                  height: 300,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: ChatWidget(
+                                          isNightChat: false,
+                                        ),
+                                      ),
+                                      if (gameData['currentUser']?['role']?['isNightRole'] == true) ...[
+                                        const SizedBox(height: 16),
+                                        Expanded(
+                                          child: ChatWidget(
+                                            isNightChat: true,
+                                            canAccessNightChat: true,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               PlayerList(
                                 players: gameData['players'],
                                 currentUser: gameData['currentUser'],

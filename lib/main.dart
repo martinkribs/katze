@@ -4,6 +4,7 @@ import 'package:katze/core/services/auth_service.dart';
 import 'package:katze/core/services/deep_link_service.dart';
 import 'package:katze/core/services/notification_service.dart';
 import 'package:katze/core/services/websocket_service.dart';
+import 'package:katze/core/services/chat_service.dart';
 import 'package:katze/presentation/pages/game_page.dart';
 import 'package:katze/presentation/pages/game_settings_page.dart';
 import 'package:katze/presentation/pages/verification_required_page.dart';
@@ -15,6 +16,7 @@ import 'package:katze/presentation/providers/game_invite_provider.dart';
 import 'package:katze/presentation/providers/notification_provider.dart';
 import 'package:katze/presentation/providers/role_info_provider.dart';
 import 'package:katze/presentation/providers/theme_provider.dart';
+import 'package:katze/presentation/providers/chat_provider.dart';
 import 'package:katze/presentation/widgets/join_game_modal.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -29,6 +31,7 @@ void main() async {
   final authService = AuthService(websocketService);
   final deepLinkService = DeepLinkService();
   final notificationService = NotificationService();
+  final chatService = ChatService(websocketService, authService);
   tz.initializeTimeZones();
 
   // Initialize services that require async setup
@@ -38,7 +41,7 @@ void main() async {
   ]);
 
   // Setup WebSocket message handler
-  websocketService.onMessageReceived = (message) {
+  websocketService.addMessageHandler((message) {
     try {
       final Map<String, dynamic> data = message as Map<String, dynamic>;
       
@@ -58,7 +61,7 @@ void main() async {
     } catch (e) {
       print('Error processing WebSocket message: $e');
     }
-  };
+  });
 
   runApp(MyApp(
     services: AppServices(
@@ -66,6 +69,7 @@ void main() async {
       notificationService: notificationService,
       authService: authService,
       websocketService: websocketService,
+      chatService: chatService,
     ),
   ));
 }
@@ -76,12 +80,14 @@ class AppServices {
   final NotificationService notificationService;
   final AuthService authService;
   final WebSocketService websocketService;
+  final ChatService chatService;
 
   const AppServices({
     required this.deepLinkService,
     required this.notificationService,
     required this.authService,
     required this.websocketService,
+    required this.chatService,
   });
 }
 
@@ -102,6 +108,7 @@ class MyApp extends StatelessWidget {
         Provider<DeepLinkService>.value(value: services.deepLinkService),
         Provider<NotificationService>.value(value: services.notificationService),
         Provider<WebSocketService>.value(value: services.websocketService),
+        Provider<ChatService>.value(value: services.chatService),
         
         // Game-related Providers with proper dependency order
         ChangeNotifierProvider(
@@ -155,6 +162,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => ThemeProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => ChatProvider(services.chatService),
         ),
       ],
       child: Consumer<ThemeProvider>(

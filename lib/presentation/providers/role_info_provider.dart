@@ -10,7 +10,7 @@ class RoleInfoProvider with ChangeNotifier {
   final AuthService _authService;
   final LoadingProvider _loadingProvider;
 
-  Map<String, Map<String, dynamic>> _roleActionTypesCache = {};
+  final Map<String, Map<String, dynamic>> _roleActionTypesCache = {};
   List<Map<String, dynamic>> _roles = [];
 
   RoleInfoProvider(this._authService, this._loadingProvider);
