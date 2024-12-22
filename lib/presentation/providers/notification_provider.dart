@@ -9,8 +9,19 @@ class NotificationProvider with ChangeNotifier {
   NotificationProvider(this._service);
 
   bool get isInitialized => _isInitialized;
+  bool get notificationsEnabled => _service.notificationsEnabled;
   String? get error => _error;
   GlobalKey<NavigatorState> get navigationKey => _service.navigationKey;
+
+  Future<void> requestPermissions() async {
+    try {
+      await _service.requestNotificationsPermission();
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
 
   Future<void> initialize() async {
     try {

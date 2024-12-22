@@ -257,14 +257,14 @@ class _GamePageState extends State<GamePage> {
                                   height: 300,
                                   child: Column(
                                     children: [
-                                      Expanded(
+                                      const Expanded(
                                         child: ChatWidget(
                                           isNightChat: false,
                                         ),
                                       ),
                                       if (gameData['currentUser']?['role']?['isNightRole'] == true) ...[
                                         const SizedBox(height: 16),
-                                        Expanded(
+                                        const Expanded(
                                           child: ChatWidget(
                                             isNightChat: true,
                                             canAccessNightChat: true,
