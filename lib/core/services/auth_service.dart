@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:katze/core/config/app_config.dart';
+
 import 'websocket_service.dart';
 
 class AuthService {
@@ -115,11 +116,13 @@ class AuthService {
 
       if (response.statusCode != 200) {
         final error = jsonDecode(response.body);
-        throw AuthException(error['message'] ?? 'Failed to process forgot password request');
+        throw AuthException(
+            error['message'] ?? 'Failed to process forgot password request');
       }
     } catch (e) {
       if (e is AuthException) rethrow;
-      throw AuthException('Failed to process forgot password request: ${e.toString()}');
+      throw AuthException(
+          'Failed to process forgot password request: ${e.toString()}');
     }
   }
 
@@ -273,7 +276,7 @@ class AuthService {
 
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/login?XDEBUG_SESSION=PHPSTORM'),
+        Uri.parse('$_baseUrl/login'),
         headers: _getBaseHeaders(),
         body: jsonEncode({
           'email': email,
