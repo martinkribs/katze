@@ -124,6 +124,10 @@ class GameActionProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final result = Map<String, dynamic>.from(jsonDecode(response.body));
+        // Refresh role action types to get updated usage counts
+        if (_roleActionTypes != null) {
+          await loadRoleActionTypes(_roleActionTypes!['role']['id'].toString());
+        }
         // Refresh game details to get updated state
         await _gameManagementProvider.loadGameDetails(gameId);
         return result;
@@ -188,5 +192,16 @@ class GameActionProvider with ChangeNotifier {
     } finally {
       _loadingProvider.setLoading(false);
     }
+  }
+
+  // Get action type details by ID
+  Map<String, dynamic>? getActionType(String actionTypeId) {
+    if (_roleActionTypes == null) return null;
+    
+    final actionTypes = _roleActionTypes!['action_types'] as List<dynamic>;
+    return actionTypes.firstWhere(
+      (a) => a['id'].toString() == actionTypeId,
+      orElse: () => null,
+    );
   }
 }

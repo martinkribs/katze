@@ -35,10 +35,10 @@ class GameActionButton extends StatelessWidget {
                 action['description'],
                 style: theme.textTheme.bodySmall,
               ),
-              if (action['usageLimit'] != null) ...[
+              if (action['usage_limit'] != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Can be used ${action['usageLimit']} time(s)',
+                  'Used ${action['actions_used']}/${action['usage_limit']} time(s)',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
                   ),
@@ -94,6 +94,10 @@ class GameActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final usageLimit = action['usage_limit'];
+    final actionsUsed = action['actions_used'];
+    final canUse = action['can_use'];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: ElevatedButton(
@@ -102,8 +106,9 @@ class GameActionButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          backgroundColor: !canUse ? theme.disabledColor : null,
         ),
-        onPressed: isLoading ? null : () => _showConfirmationDialog(context),
+        onPressed: (isLoading || !canUse) ? null : () => _showConfirmationDialog(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -120,12 +125,13 @@ class GameActionButton extends StatelessWidget {
                 color: theme.colorScheme.onPrimary.withOpacity(0.8),
               ),
             ),
-            if (action['usageLimit'] != null) ...[
+            if (usageLimit != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Can be used ${action['usageLimit']} time(s)',
+                'Used $actionsUsed/${usageLimit} time(s)',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onPrimary.withOpacity(0.7),
+                  fontWeight: !canUse ? FontWeight.bold : null,
                 ),
               ),
             ],

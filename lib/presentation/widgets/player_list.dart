@@ -79,10 +79,7 @@ class PlayerList extends StatelessWidget {
 
     // Check if actions are allowed based on time
     final bool canActNow = canPerformActions &&
-        ((isDay &&
-                actionTypes.any((action) => action['is_day_action'] == true)) ||
-            (!isDay &&
-                actionTypes.any((action) => action['is_day_action'] == false)));
+        actionTypes.any((action) => action['can_use'] == true);
 
     final bool isGameMaster = currentUser['isGameMaster'] == true;
     final bool isPending = gameStatus == 'pending';
@@ -150,15 +147,13 @@ class PlayerList extends StatelessWidget {
                     !isCurrentUser &&
                     player['status']['user'] == 'alive';
 
-                // Get available actions for current phase
+                // Get available actions
                 final availableActions = isVotingPhase
                     ? [
                         {'name': 'Vote', 'id': 'vote'}
                       ]
                     : actionTypes
-                        .where((action) => isDay
-                            ? action['is_day_action'] == true
-                            : action['is_day_action'] == false)
+                        .where((action) => action['can_use'] == true)
                         .toList();
 
                 return Container(
