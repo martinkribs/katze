@@ -8,7 +8,7 @@ class PlayerList extends StatelessWidget {
   final Map<String, dynamic> currentUser;
   final String gameId;
   final String gameStatus;
-  final bool isVotingPhase;
+  final String phase;
   final Map<String, dynamic>? gameDetails;
 
   const PlayerList({
@@ -17,7 +17,7 @@ class PlayerList extends StatelessWidget {
     required this.currentUser,
     required this.gameId,
     required this.gameStatus,
-    required this.isVotingPhase,
+    required this.phase,
     this.gameDetails,
   });
 
@@ -68,7 +68,7 @@ class PlayerList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isGameStarted = gameStatus == 'in_progress';
-    final bool isDay = gameDetails?['isDay'] ?? true;
+    final bool isVotingPhase = phase == 'voting';
     final actionTypes =
         context.watch<GameActionProvider>().roleActionTypes?['action_types'] ?? [];
 
@@ -96,44 +96,7 @@ class PlayerList extends StatelessWidget {
             ),
             if (isVotingPhase || canActNow) ...[
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: isVotingPhase
-                      ? theme.primaryColor.withOpacity(0.1)
-                      : Colors.blue.withOpacity(0.1),
-                  border: Border.all(
-                    color: isVotingPhase ? theme.primaryColor : Colors.blue,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isVotingPhase
-                          ? Icons.how_to_vote
-                          : Icons.play_circle_outline,
-                      color:
-                          isVotingPhase ? theme.primaryColor : Colors.blue,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isVotingPhase ? 'Voting Phase' : 'Actions Available',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: isVotingPhase
-                            ? theme.primaryColor
-                            : Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildPhaseIndicator(context),
             ],
             const SizedBox(height: 16),
             ListView.builder(
@@ -274,6 +237,72 @@ class PlayerList extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhaseIndicator(BuildContext context) {
+    final theme = Theme.of(context);
+    Color phaseColor;
+    IconData phaseIcon;
+    String phaseText;
+
+    switch (phase) {
+      case 'preparation':
+        phaseColor = Colors.blue;
+        phaseIcon = Icons.hourglass_empty;
+        phaseText = 'Preparation Phase';
+        break;
+      case 'day':
+        phaseColor = Colors.orange;
+        phaseIcon = Icons.wb_sunny;
+        phaseText = 'Day Actions Available';
+        break;
+      case 'night':
+        phaseColor = Colors.indigo;
+        phaseIcon = Icons.nightlight_round;
+        phaseText = 'Night Actions Available';
+        break;
+      case 'voting':
+        phaseColor = Colors.green;
+        phaseIcon = Icons.how_to_vote;
+        phaseText = 'Voting Phase';
+        break;
+      default:
+        phaseColor = Colors.grey;
+        phaseIcon = Icons.question_mark;
+        phaseText = 'Unknown Phase';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: phaseColor.withOpacity(0.1),
+        border: Border.all(
+          color: phaseColor,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            phaseIcon,
+            color: phaseColor,
+            size: 20,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            phaseText,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: phaseColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

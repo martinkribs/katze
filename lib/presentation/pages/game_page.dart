@@ -240,12 +240,8 @@ class _GamePageState extends State<GamePage> {
                                 ElevatedButton.icon(
                                   onPressed:
                                       (gameData['players'] as List).length >= 3
-                                          ? () async {
-                                              await gameManagementProvider.startGame(
-                                                  widget.gameId.toString());
-                                              if (!mounted) return;
-                                              _loadGameData();
-                                            }
+                                          ? () => gameManagementProvider.startGame(
+                                              widget.gameId.toString())
                                           : null,
                                   icon: const Icon(Icons.play_arrow),
                                   label: const Text('Start Game'),
@@ -281,9 +277,7 @@ class _GamePageState extends State<GamePage> {
                                 currentUser: gameData['currentUser'],
                                 gameId: widget.gameId.toString(),
                                 gameStatus: gameData['status'],
-                                isVotingPhase: gameData['gameDetails']
-                                        ['isVotingPhase'] ??
-                                    false,
+                                phase: gameData['gameDetails']['phase'] ?? 'preparation',
                                 gameDetails: gameData['gameDetails'],
                               ),
                             ],

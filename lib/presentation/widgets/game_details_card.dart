@@ -34,7 +34,7 @@ class GameDetailsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (gameData['status'] == 'in_progress') ...[
-              GamePhaseDisplay(isDay: gameDetails['isDay']),
+              GamePhaseDisplay(phase: gameDetails['phase']),
               const SizedBox(height: 16),
             ],
             Text(
@@ -89,12 +89,10 @@ class GameDetailsCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (currentUser['role']['can_use_day_action'] == true ||
-                        currentUser['role']['can_use_night_action'] ==
-                            true) ...[
+                    if (currentUser['role']['allowed_phases']?.isNotEmpty == true) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Can act during: ${_getActionTimes(currentUser['role'])}',
+                        'Can act during: ${_formatAllowedPhases(currentUser['role']['allowed_phases'])}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontStyle: FontStyle.italic,
                         ),
@@ -144,10 +142,21 @@ class GameDetailsCard extends StatelessWidget {
     );
   }
 
-  String _getActionTimes(Map<String, dynamic> role) {
-    final List<String> times = [];
-    if (role['can_use_day_action'] == true) times.add('Day');
-    if (role['can_use_night_action'] == true) times.add('Night');
-    return times.join(' & ');
+  String _formatAllowedPhases(List<dynamic> phases) {
+    final formattedPhases = phases.map((phase) {
+      switch (phase) {
+        case 'preparation':
+          return 'Preparation';
+        case 'day':
+          return 'Day';
+        case 'night':
+          return 'Night';
+        case 'voting':
+          return 'Voting';
+        default:
+          return phase.toString();
+      }
+    }).toList();
+    return formattedPhases.join(' & ');
   }
 }

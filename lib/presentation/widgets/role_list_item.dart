@@ -40,9 +40,9 @@ class RoleListItem extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (role['can_use_night_action'] == true)
+          if (role['allowed_phases']?.isNotEmpty == true)
             Text(
-              'Night Action',
+              'Can act in: ${_formatAllowedPhases(role['allowed_phases'])}',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.secondary,
                 fontSize: 12,
@@ -72,5 +72,23 @@ class RoleListItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatAllowedPhases(List<dynamic> phases) {
+    final formattedPhases = phases.map((phase) {
+      switch (phase) {
+        case 'preparation':
+          return 'Preparation';
+        case 'day':
+          return 'Day';
+        case 'night':
+          return 'Night';
+        case 'voting':
+          return 'Voting';
+        default:
+          return phase.toString();
+      }
+    }).toList();
+    return formattedPhases.join(' & ');
   }
 }

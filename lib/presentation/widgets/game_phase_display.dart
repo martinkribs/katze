@@ -1,32 +1,69 @@
 import 'package:flutter/material.dart';
 
 class GamePhaseDisplay extends StatelessWidget {
-  final bool isDay;
+  final String phase;
 
   const GamePhaseDisplay({
     super.key,
-    required this.isDay,
+    required this.phase,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    Color phaseColor;
+    IconData phaseIcon;
+    String phaseTitle;
+    String phaseTime;
+
+    switch (phase) {
+      case 'preparation':
+        phaseColor = Colors.blue;
+        phaseIcon = Icons.hourglass_empty;
+        phaseTitle = 'Preparation Phase';
+        phaseTime = 'Game is preparing to start';
+        break;
+      case 'day':
+        phaseColor = Colors.orange;
+        phaseIcon = Icons.wb_sunny;
+        phaseTitle = 'Day Phase';
+        phaseTime = '7:30 AM - 7:30 PM';
+        break;
+      case 'night':
+        phaseColor = Colors.indigo;
+        phaseIcon = Icons.nightlight_round;
+        phaseTitle = 'Night Phase';
+        phaseTime = '7:30 PM - 7:30 AM';
+        break;
+      case 'voting':
+        phaseColor = Colors.green;
+        phaseIcon = Icons.how_to_vote;
+        phaseTitle = 'Voting Phase';
+        phaseTime = 'Time to vote!';
+        break;
+      default:
+        phaseColor = Colors.grey;
+        phaseIcon = Icons.question_mark;
+        phaseTitle = 'Unknown Phase';
+        phaseTime = '';
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDay ? Colors.orange.withOpacity(0.2) : Colors.indigo.withOpacity(0.2),
+        color: phaseColor.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isDay ? Colors.orange : Colors.indigo,
+          color: phaseColor,
           width: 2,
         ),
       ),
       child: Row(
         children: [
           Icon(
-            isDay ? Icons.wb_sunny : Icons.nightlight_round,
-            color: isDay ? Colors.orange : Colors.indigo,
+            phaseIcon,
+            color: phaseColor,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -35,16 +72,16 @@ class GamePhaseDisplay extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isDay ? 'Day Phase' : 'Night Phase',
+                  phaseTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: isDay ? Colors.orange : Colors.indigo,
+                    color: phaseColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  isDay ? '7:30 AM - 7:30 PM' : '7:30 PM - 7:30 AM',
+                  phaseTime,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDay ? Colors.orange : Colors.indigo,
+                    color: phaseColor,
                   ),
                 ),
               ],

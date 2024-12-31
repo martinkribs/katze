@@ -90,10 +90,11 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                if (role['can_use_night_action'] == true)
-                  const Text('• Can perform night actions'),
+                if (role['allowed_phases']?.isNotEmpty == true) ...[
+                  Text('• Can act during: ${_formatAllowedPhases(role['allowed_phases'])}'),
+                ],
                 if (role['can_vote'] == true)
-                  const Text('• Can vote during day phase'),
+                  const Text('• Can vote during voting phase'),
                 const SizedBox(height: 16),
                 Text(
                   'Action Types',
@@ -120,7 +121,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                         Padding(
                           padding: const EdgeInsets.only(left: 16),
                           child: Text(
-                            action['is_day_action'] ? 'Day Action' : 'Night Action',
+                            'Allowed in: ${_formatAllowedPhases(action['allowed_phases'])}',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.secondary,
                               fontSize: 12,
@@ -210,6 +211,24 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
     return hasVillager && hasCat;
   }
 
+  String _formatAllowedPhases(List<dynamic> phases) {
+    final formattedPhases = phases.map((phase) {
+      switch (phase) {
+        case 'preparation':
+          return 'Preparation';
+        case 'day':
+          return 'Day';
+        case 'night':
+          return 'Night';
+        case 'voting':
+          return 'Voting';
+        default:
+          return phase.toString();
+      }
+    }).toList();
+    return formattedPhases.join(' & ');
+  }
+
   void _saveSettings() async {
     if (!_canSaveSettings()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,10 +271,11 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
           appBar: AppBar(
             title: const Text('Game Settings'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.save),
-                onPressed: loadingProvider.isLoading ? null : _saveSettings,
-              ),
+              if (context.read<GameManagementProvider>().currentGame?['status'] == 'pending')
+                IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: loadingProvider.isLoading ? null : _saveSettings,
+                ),
             ],
           ),
           body: loadingProvider.isLoading && gameSettingsProvider.currentGameSettings == null
@@ -287,7 +307,7 @@ class _GameSettingsPageState extends State<GameSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          RoleSettingsCard(
+                          if (context.read<GameManagementProvider>().currentGame?['status'] == 'pending') RoleSettingsCard(
                             useDefault: _useDefault,
                             onDefaultChanged: (value) {
                               setState(() {
